@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3 uid="uid://bb6erh0r0w6ho"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hlyys"]
+albedo_color = Color(0.099985994, 0.099985994, 0.099985994, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_hlyys"]
+material = SubResource("StandardMaterial3D_hlyys")
+radius = 0.05
+height = 0.1
+radial_segments = 4
+rings = 4
+
+[node name="FishEye" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_hlyys")

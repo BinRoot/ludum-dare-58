@@ -1,0 +1,38 @@
+[gd_scene load_steps=4 format=3 uid="uid://fmoiqtua5rsi"]
+
+[ext_resource type="Script" uid="uid://xxydjp8j06lm" path="res://Scenes/fish.gd" id="1_twvwo"]
+[ext_resource type="PackedScene" uid="uid://bb6erh0r0w6ho" path="res://Scenes/fish_eye.tscn" id="2_c4ibo"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_it8au"]
+
+[node name="Fish" type="Node3D"]
+script = ExtResource("1_twvwo")
+
+[node name="Cube" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.4369907)
+mesh = SubResource("BoxMesh_it8au")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.3356924)
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.332326, 6.0395727)
+omni_range = 11.913473
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Button" type="Button" parent="Control"]
+layout_mode = 0
+offset_right = 8.0
+offset_bottom = 8.0
+text = "   Up   "
+
+[node name="LeftFishEye" parent="." instance=ExtResource("2_c4ibo")]
+
+[node name="RightFishEye" parent="." instance=ExtResource("2_c4ibo")]
+
+[connection signal="pressed" from="Control/Button" to="." method="_on_button_pressed"]
