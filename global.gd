@@ -18,6 +18,9 @@ var is_selecting_tank: bool = false
 signal fish_tank_selection_started
 signal fish_placed_in_tank
 
+# Global tracking of caught fish to prevent double-catching
+var globally_caught_fish: Array[Node3D] = []
+
 func _ready():
 	# Create the net item
 	net_item = ItemData.new()

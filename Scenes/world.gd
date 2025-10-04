@@ -82,13 +82,28 @@ func _find_fish_recursive(node: Node, fish_list: Array[Node3D]):
 
 func _on_fish_caught(fish: Node3D, tile: Node3D):
 	print("Fish caught at tile: ", tile.position)
-	# Consume the net from the tile (it was used to catch the fish)
-	if tile:
-		tile.consume_net()
+
+	# Remove all nets from all tiles and return 3 nets to inventory
+	_remove_all_nets_and_return_to_inventory()
 
 	# Show the fish close to camera and ask user to select a tank
 	if fish:
 		_show_fish_for_tank_selection(fish)
+
+func _remove_all_nets_and_return_to_inventory():
+	# Count how many nets are actually placed and remove them
+	var nets_placed = 0
+	for tile in sea_tiles:
+		# Check if tile has a net (either fully placed or being cast)
+		if tile.has_net or tile.is_casting_net:
+			nets_placed += 1
+		# Remove the net
+		if tile.has_method("consume_net"):
+			tile.consume_net()
+
+	# Return only the nets that were actually placed
+	if nets_placed > 0:
+		Global.add_item("net", nets_placed)
 
 func _show_fish_for_tank_selection(fish: Node3D):
 	# Store the caught fish globally
@@ -121,6 +136,10 @@ func _show_fish_for_tank_selection(fish: Node3D):
 # Called when a fish is placed in a tank - spawn a new one
 func _on_fish_placed_in_tank():
 	print("Spawning new fish in ocean...")
+
+	# Clear the global caught fish list (fish has been processed)
+	Global.globally_caught_fish.clear()
+
 	_spawn_new_fish()
 
 	# Animate camera back to original position

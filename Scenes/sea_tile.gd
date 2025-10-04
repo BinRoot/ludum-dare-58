@@ -95,8 +95,10 @@ func _process(_delta):
 					max_is_under = max(max_is_under, is_under)
 
 					# Check if fish is caught by net
-					if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish:  # Fish is in the center area
+					# Check both local and global caught lists to prevent double-catching
+					if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish:
 						caught_fish.append(fish_ref)
+						Global.globally_caught_fish.append(fish_ref)  # Mark as globally caught immediately
 						fish_caught.emit(fish_ref, self)
 						_celebrate_catch()
 
@@ -163,6 +165,17 @@ func consume_net():
 		has_net = false
 		caught_fish.clear()  # Reset caught fish list
 		_remove_net_visual()
+
+	# Also cancel any ongoing casting
+	cancel_casting()
+
+func cancel_casting():
+	# Cancel any net casting in progress
+	if is_casting_net:
+		is_casting_net = false
+		if casting_tween and casting_tween.is_running():
+			casting_tween.kill()
+		_remove_casting_visual()
 
 func _create_net_visual():
 	if net_visual == null:
