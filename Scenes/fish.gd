@@ -23,7 +23,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 # User parameters
 # ===============
 @export var graph: Array[Vector2i] = [Vector2i(1, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4)]
-@export var move_speed := 6.0
+@export var move_speed := 2.0
 @export var bounds_shape: CollisionShape3D
 
 @export var body_segments: int = 64
@@ -86,10 +86,10 @@ var arrival_distance: float = 0.5
 var is_surfacing: bool = false
 var surface_timer: float = 0.0
 var next_surface_time: float = 0.0
-@export var surface_interval_min: float = 1.0  # Minimum time between surfaces
-@export var surface_interval_max: float = 5.0  # Maximum time between surfaces
-@export var surface_duration: float = 0.5  # How long the fish stays visible at surface
-@export var surface_look_angle: float = 25.0  # Degrees to look up when surfacing
+@export var surface_interval_min: float = 2.0  # Minimum time between surfaces
+@export var surface_interval_max: float = 8.0  # Maximum time between surfaces
+@export var surface_duration: float = 1.0  # How long the fish stays visible at surface
+@export var surface_look_angle: float = 90.0  # Degrees to look up when surfacing
 
 var _mesh_instance: MeshInstance3D
 var _debug_mesh_instance: MeshInstance3D

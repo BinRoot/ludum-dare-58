@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=9 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://bj2m6hkljq3ax" path="res://Scenes/player.tscn" id="1_a02cp"]
@@ -14,6 +14,12 @@ albedo_color = Color(0.049582362, 0.18022257, 0.35306874, 1)
 material = SubResource("StandardMaterial3D_5a7ea")
 size = Vector2(20, 30)
 
+[sub_resource type="PlaneMesh" id="PlaneMesh_8j60k"]
+size = Vector2(50, 50)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8j60k"]
+albedo_color = Color(0.78431374, 0.4509804, 0, 1)
+
 [node name="World" type="Node3D"]
 script = ExtResource("1_5a7ea")
 
@@ -28,20 +34,27 @@ transform = Transform3D(-0.6242157, 0.77810675, -0.070034094, 0.028063513, 0.111
 light_energy = 1.311
 light_specular = 1.428
 
-[node name="Fish" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("3_5a7ea")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.539093, 0)
-visible = false
-bounds_shape = NodePath("../Pond/CollisionShape3D")
-
 [node name="Pond" type="Area3D" parent="."]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Pond"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -5)
 shape = SubResource("BoxShape3D_5a7ea")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Pond/CollisionShape3D"]
+[node name="Water" type="MeshInstance3D" parent="Pond/CollisionShape3D"]
 mesh = SubResource("PlaneMesh_5a7ea")
 skeleton = NodePath("../..")
 
 [node name="Fish2" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("3_5a7ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.844208, 0, 0)
+visible = false
 bounds_shape = NodePath("../Pond/CollisionShape3D")
+
+[node name="Fish" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("3_5a7ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.844208, -0.539093, 0)
+visible = false
+bounds_shape = NodePath("../Pond/CollisionShape3D")
+
+[node name="Sand" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -5)
+mesh = SubResource("PlaneMesh_8j60k")
+surface_material_override/0 = SubResource("StandardMaterial3D_8j60k")
