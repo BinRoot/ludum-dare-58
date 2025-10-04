@@ -422,11 +422,13 @@ func _check_collision() -> bool:
 	for tank in all_tanks:
 		if tank == self:
 			continue
-
+		# Skip invalid or freed nodes
+		if not is_instance_valid(tank):
+			continue
+		# Ensure we can read bounds from the other tank
 		if tank is Node3D and tank.has_method("get_grid_bounds"):
-			var other_bounds = tank.get_grid_bounds()
-			var my_bounds = get_grid_bounds()
-
+			var other_bounds: Dictionary = tank.get_grid_bounds()
+			var my_bounds: Dictionary = get_grid_bounds()
 			# Check rectangle overlap
 			if _rectangles_overlap(my_bounds, other_bounds):
 				return true
@@ -443,16 +445,27 @@ func get_grid_bounds() -> Dictionary:
 	}
 
 func _rectangles_overlap(rect1: Dictionary, rect2: Dictionary) -> bool:
-	# Check if two rectangles overlap
-	var r1_right = rect1.col + rect1.width
-	var r1_bottom = rect1.row + rect1.height
-	var r2_right = rect2.col + rect2.width
-	var r2_bottom = rect2.row + rect2.height
+	# Safely read rectangle fields
+	var r1_col: int = int(rect1.get("col", 0))
+	var r1_row: int = int(rect1.get("row", 0))
+	var r1_w: int = int(rect1.get("width", 0))
+	var r1_h: int = int(rect1.get("height", 0))
+
+	var r2_col: int = int(rect2.get("col", 0))
+	var r2_row: int = int(rect2.get("row", 0))
+	var r2_w: int = int(rect2.get("width", 0))
+	var r2_h: int = int(rect2.get("height", 0))
+
+	# Compute rectangle edges (right/bottom are exclusive bounds)
+	var r1_right: int = r1_col + r1_w
+	var r1_bottom: int = r1_row + r1_h
+	var r2_right: int = r2_col + r2_w
+	var r2_bottom: int = r2_row + r2_h
 
 	# No overlap if one is completely to the left/right/above/below the other
-	if rect1.col >= r2_right or rect2.col >= r1_right:
+	if r1_col >= r2_right or r2_col >= r1_right:
 		return false
-	if rect1.row >= r2_bottom or rect2.row >= r1_bottom:
+	if r1_row >= r2_bottom or r2_row >= r1_bottom:
 		return false
 
 	return true
