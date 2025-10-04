@@ -23,6 +23,8 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 # User parameters
 # ===============
 @export var graph: Array[Vector2i] = [Vector2i(1, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4)]
+@export var move_speed := 6.0
+@export var bounds_shape: CollisionShape3D
 
 @export var body_segments: int = 64
 @export var ring_sides: int = 32
@@ -57,6 +59,12 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @export var wiggle_speed: float = 1.5
 @export var tail_amplification: float = 2.5
 
+@export_group("Scaling")
+@export var enable_complexity_scaling: bool = true
+@export var min_scale: float = 0.5
+@export var max_scale: float = 10.0
+@export var base_complexity: float = 5.0  # Graph with 4 nodes = 1.0 scale
+
 @export_group("Debug")
 @export var debug_mode: bool = true
 @export var debug_spine_color: Color = Color(1.0, 0.0, 0.0)
@@ -66,7 +74,13 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @onready var left_fish_eye: Node3D = $LeftFishEye
 @onready var right_fish_eye: Node3D = $RightFishEye
 
+
 const TAU: float = PI * 2.0
+
+# Movement state
+var current_target: Vector3 = Vector3.ZERO
+var is_moving: bool = false
+var arrival_distance: float = 0.5
 
 var _mesh_instance: MeshInstance3D
 var _debug_mesh_instance: MeshInstance3D
@@ -82,11 +96,40 @@ var _spine_segments: int
 
 func _ready() -> void:
 	render_graph()
+	# Start moving once the fish is ready
+	_pick_new_destination()
 
-func _process(_delta: float) -> void:
+# Calculate scale factor based on graph complexity
+func _calculate_complexity_scale() -> float:
+	if not enable_complexity_scaling:
+		return 1.0
+
+	var nodes: Array[int] = _collect_nodes(graph)
+	var num_nodes: float = float(nodes.size())
+	var num_edges: float = float(graph.size())
+
+	# Complexity metric: weighted combination of nodes and edges
+	# More weight on nodes since they represent major structural elements
+	var complexity: float = num_nodes + (num_edges * 2)
+
+	# Scale relative to base complexity
+	var scale_factor: float = sqrt(complexity / base_complexity)
+
+	# Clamp to min/max range
+	return clamp(scale_factor, min_scale, max_scale)
+
+func _process(delta: float) -> void:
+	# Handle movement
+	if is_moving:
+		_move_toward_target(delta)
+
 	# Update eye positions to match the wiggle animation
 	if _spine_curve.size() > 0 and left_fish_eye != null and right_fish_eye != null:
 		_update_wiggling_eyes()
+
+		# Make eyes look at the destination while moving
+		if is_moving:
+			_make_eyes_look_at_target()
 
 func render_graph() -> void:
 	if _mesh_instance != null:
@@ -101,6 +144,9 @@ func render_graph() -> void:
 	if nodes.size() < 2:
 		push_warning("Graph has fewer than 2 nodes; nothing to render.")
 		return
+
+	# Calculate complexity-based scale factor
+	var complexity_scale: float = _calculate_complexity_scale()
 
 	var adj: Dictionary = _build_undirected_adjacency(graph)
 
@@ -193,8 +239,8 @@ func render_graph() -> void:
 	for j7: int in range(ns):
 		var s_val: float = float(j7) / float(ns - 1)
 		var gauss: float = bulge_amp * exp(-pow(s_val - bulge_center, 2.0) / max(1e-6, pow(bulge_sigma, 2.0)))
-		var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss)
-		var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss)
+		var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss) * complexity_scale
+		var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss) * complexity_scale
 		b_s *= (1.0 + asymmetry_amp * bias[j7])
 
 		var phi: float = twist * s_val
@@ -286,7 +332,8 @@ func render_graph() -> void:
 				continue
 			var pa: Vector3 = node_anchor[au]
 			var pb: Vector3 = node_anchor[bv]
-			_append_cylinder(verts, norms, uvs, colors, idx, pa, pb, tube_radius, tube_segments, ring_sides)
+			var scaled_tube_radius: float = tube_radius * complexity_scale
+			_append_cylinder(verts, norms, uvs, colors, idx, pa, pb, scaled_tube_radius, tube_segments, ring_sides)
 
 	# ==============================================
 	# STEP 1: Rotate fish so spine aligns to X-axis
@@ -420,6 +467,9 @@ func _position_eyes(C: PackedVector3Array, N: PackedVector3Array, B: PackedVecto
 	if left_fish_eye == null or right_fish_eye == null:
 		return
 
+	# Get complexity scale for consistent sizing
+	var complexity_scale: float = _calculate_complexity_scale()
+
 	# Position eyes at ~90% along spine (near head)
 	var eye_s: float = 0.90
 	var j_eye: int = clamp(int(eye_s * float(ns - 1)), 0, ns - 1)
@@ -430,8 +480,8 @@ func _position_eyes(C: PackedVector3Array, N: PackedVector3Array, B: PackedVecto
 	# Calculate body dimensions at this point (same as mesh generation)
 	var s_val: float = float(j_eye) / float(ns - 1)
 	var gauss: float = bulge_amp * exp(-pow(s_val - bulge_center, 2.0) / max(1e-6, pow(bulge_sigma, 2.0)))
-	var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss)
-	var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss)
+	var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss) * complexity_scale
+	var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss) * complexity_scale
 	b_s *= (1.0 + asymmetry_amp * bias[j_eye])  # Apply asymmetry like the mesh does
 
 	# Apply twist rotation (same as mesh generation)
@@ -588,6 +638,9 @@ func _update_wiggling_eyes() -> void:
 	if _spine_curve.size() == 0:
 		return
 
+	# Get complexity scale for consistent sizing
+	var complexity_scale: float = _calculate_complexity_scale()
+
 	var ns: int = _spine_segments
 	var C: PackedVector3Array = _spine_curve
 	var N: PackedVector3Array = _spine_normals
@@ -605,8 +658,8 @@ func _update_wiggling_eyes() -> void:
 	# Calculate body dimensions at this point (same as mesh generation)
 	var s_val: float = float(j_eye) / float(ns - 1)
 	var gauss: float = bulge_amp * exp(-pow(s_val - bulge_center, 2.0) / max(1e-6, pow(bulge_sigma, 2.0)))
-	var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss)
-	var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss)
+	var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss) * complexity_scale
+	var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss) * complexity_scale
 	b_s *= (1.0 + asymmetry_amp * bias[j_eye])
 
 	# Apply twist rotation to get the correct binormal direction
@@ -917,6 +970,122 @@ func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
 		var rj2: int = base + ((i4 + 1) % sides)
 		idx.append_array(PackedInt32Array([cap_b, ri2, rj2]))
 
+
+# ======================
+# Movement Functions
+# ======================
+
+# Pick a random destination within the bounds
+func _pick_new_destination() -> void:
+	if bounds_shape == null:
+		push_warning("No bounds_shape set for fish movement")
+		is_moving = false
+		return
+
+	var shape: Shape3D = bounds_shape.shape
+	if shape == null:
+		push_warning("bounds_shape has no shape resource")
+		is_moving = false
+		return
+
+	# Get a random position within the bounds
+	var random_pos: Vector3
+	if shape is BoxShape3D:
+		var box: BoxShape3D = shape as BoxShape3D
+		var size: Vector3 = box.size
+		random_pos = Vector3(
+			randf_range(-size.x / 2.0, size.x / 2.0),
+			randf_range(-size.y / 2.0, size.y / 2.0),
+			randf_range(-size.z / 2.0, size.z / 2.0)
+		)
+		# Transform to world space
+		random_pos = bounds_shape.global_transform * random_pos
+	elif shape is SphereShape3D:
+		var sphere: SphereShape3D = shape as SphereShape3D
+		# Generate random point in sphere
+		var theta: float = randf() * TAU
+		var phi: float = acos(2.0 * randf() - 1.0)
+		var r: float = pow(randf(), 1.0 / 3.0) * sphere.radius
+		random_pos = Vector3(
+			r * sin(phi) * cos(theta),
+			r * sin(phi) * sin(theta),
+			r * cos(phi)
+		)
+		random_pos = bounds_shape.global_transform * random_pos
+	else:
+		# Default to a simple box if shape type is unknown
+		random_pos = bounds_shape.global_position + Vector3(
+			randf_range(-5.0, 5.0),
+			randf_range(-5.0, 5.0),
+			randf_range(-5.0, 5.0)
+		)
+
+	current_target = random_pos
+	is_moving = true
+
+# Move the fish toward the current target
+func _move_toward_target(delta: float) -> void:
+	var direction: Vector3 = (current_target - global_position).normalized()
+	var distance: float = global_position.distance_to(current_target)
+
+	# Check if we've arrived
+	if distance < arrival_distance:
+		_pick_new_destination()
+		return
+
+	# Move toward target
+	var movement: Vector3 = direction * move_speed * delta
+	global_position += movement
+
+	# Orient the fish toward the target (but keep it upright)
+	_orient_toward_target(direction, delta)
+
+# Orient the fish to face the target without flipping upside down
+func _orient_toward_target(direction: Vector3, delta: float) -> void:
+	if direction.length_squared() < 0.001:
+		return
+
+	# Create a target basis that faces the direction but stays upright
+	var forward: Vector3 = direction.normalized()
+	var world_up: Vector3 = Vector3.UP
+
+	# If forward is too close to straight up or down, adjust the reference up vector
+	if abs(forward.dot(world_up)) > 0.95:
+		world_up = Vector3.FORWARD
+
+	# Calculate right and up vectors
+	var right: Vector3 = forward.cross(world_up).normalized()
+	var up: Vector3 = right.cross(forward).normalized()
+
+	# Create target basis (Godot uses X-forward after our mesh rotation)
+	var target_basis: Basis = Basis(forward, up, right)
+
+	# Smoothly interpolate rotation
+	var current_basis: Basis = global_transform.basis
+	var new_basis: Basis = current_basis.slerp(target_basis, delta * 2.0)
+
+	# Apply the new rotation
+	global_transform.basis = new_basis
+
+# Make the eyes look at the current target
+func _make_eyes_look_at_target() -> void:
+	if left_fish_eye == null or right_fish_eye == null:
+		return
+
+	# Get the target in global space
+	var target_global: Vector3 = current_target
+
+	# Make each eye look at the target
+	if is_instance_valid(left_fish_eye):
+		var left_dir: Vector3 = (target_global - left_fish_eye.global_position).normalized()
+		if left_dir.length_squared() > 0.001:
+			# Keep the eye roughly upright
+			left_fish_eye.look_at(left_fish_eye.global_position + left_dir, Vector3.UP)
+
+	if is_instance_valid(right_fish_eye):
+		var right_dir: Vector3 = (target_global - right_fish_eye.global_position).normalized()
+		if right_dir.length_squared() > 0.001:
+			right_fish_eye.look_at(right_fish_eye.global_position + right_dir, Vector3.UP)
 
 func _on_button_pressed() -> void:
 	graph = mutate_graph.mutate(graph)[0]

@@ -4,7 +4,7 @@ uniform float wave_speed : hint_range(0.0, 5.0) = 1.0;
 uniform float wave_height : hint_range(0.0, 2.0) = 0.3;
 uniform float wave_frequency : hint_range(0.0, 10.0) = 2.0;
 uniform vec3 wave_direction = vec3(1.0, 0.0, 1.0);
-uniform vec4 water_color : source_color = vec4(0.1, 0.3, 0.6, 1.0);
+uniform vec4 water_color : source_color = vec4(0.07, 0.14, 0.47, 1.0);
 uniform float roughness : hint_range(0.0, 1.0) = 0.3;
 
 void vertex() {

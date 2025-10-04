@@ -1,7 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=5 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://bj2m6hkljq3ax" path="res://Scenes/player.tscn" id="1_a02cp"]
+[ext_resource type="PackedScene" uid="uid://fmoiqtua5rsi" path="res://Scenes/fish.tscn" id="3_5a7ea"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5a7ea"]
+size = Vector3(30, 1, 30)
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_5a7ea")
@@ -10,7 +14,18 @@ script = ExtResource("1_5a7ea")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.352211, 0)
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.42163736, 0.90676457, 0, -0.90676457, 0.42163736, 0, 17.094147, 8.314308)
+transform = Transform3D(1, 0, 0, 0, 0.120032914, 0.99276996, 0, -0.99276996, 0.120032914, 0, 21.499092, -1.1168208)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.34285644, 0.9393878, 0, -0.9393878, 0.34285644, 0, 14.151663, 7.1773577)
+transform = Transform3D(-0.6242157, 0.77810675, -0.070034094, 0.028063513, 0.11191788, 0.99332124, 0.7807478, 0.61808133, -0.09169731, 11.046999, 14.151663, 6.8496704)
+light_energy = 1.466
+light_specular = 3.913
+
+[node name="Fish" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("3_5a7ea")]
+bounds_shape = NodePath("../Pond/CollisionShape3D")
+
+[node name="Pond" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Pond"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25, 0, -5)
+shape = SubResource("BoxShape3D_5a7ea")

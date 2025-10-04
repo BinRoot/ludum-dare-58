@@ -1,9 +1,10 @@
 extends Node3D
 
 # Hex grid parameters
-@export var grid_width: int = 20
-@export var grid_height: int = 20
+@export var grid_width: int = 10
+@export var grid_height: int = 10
 @export var hex_radius: float = 2.0  # Must match the radius in sea_tile.gd
+@onready var fish = $Fish
 
 # Preload the sea tile scene
 var sea_tile_scene = preload("res://Scenes/sea_tile.tscn")
@@ -30,5 +31,5 @@ func generate_hex_grid():
 				x += hex_width
 
 			# Center the grid around origin
-			tile.position = Vector3(x - offset_x, 0, z - offset_z)
+			tile.position = Vector3(x - offset_x, 0, z - offset_z) - Vector3(30, 0, 5)
 			add_child(tile)
