@@ -1,8 +1,9 @@
-[gd_scene load_steps=9 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=10 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://bj2m6hkljq3ax" path="res://Scenes/player.tscn" id="1_a02cp"]
 [ext_resource type="PackedScene" uid="uid://fmoiqtua5rsi" path="res://Scenes/fish.tscn" id="3_5a7ea"]
+[ext_resource type="PackedScene" uid="uid://dlfuaipowshr3" path="res://Scenes/hud.tscn" id="4_hud"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_5a7ea"]
 size = Vector3(20, 1, 30)
@@ -58,3 +59,5 @@ bounds_shape = NodePath("../Pond/CollisionShape3D")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -5)
 mesh = SubResource("PlaneMesh_8j60k")
 surface_material_override/0 = SubResource("StandardMaterial3D_8j60k")
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]
