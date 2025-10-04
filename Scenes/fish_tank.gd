@@ -542,6 +542,10 @@ func add_fish(fish: Node3D):
 	# Add to our list of contained fish
 	contained_fish.append(fish)
 
+	# Mark fish as being in a tank
+	if "is_in_tank" in fish:
+		fish.is_in_tank = true
+
 	# Create a collision shape for the tank bounds that the fish can use
 	var tank_bounds = _create_tank_bounds()
 

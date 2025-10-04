@@ -82,6 +82,10 @@ var current_target: Vector3 = Vector3.ZERO
 var is_moving: bool = false
 var arrival_distance: float = 0.5
 
+# Age and growth
+var age: int = -1
+var is_in_tank: bool = false
+
 # Surface behavior state
 var is_surfacing: bool = false
 var surface_timer: float = 0.0
@@ -104,6 +108,9 @@ var _spine_bias: PackedFloat32Array
 var _spine_segments: int
 
 func _ready() -> void:
+	# Randomize fish color only on initial creation
+	base_color = Color(randf(), randf(), randf())
+
 	render_graph()
 	# Start moving once the fish is ready
 	_pick_new_destination()
@@ -148,9 +155,7 @@ func _process(delta: float) -> void:
 			_make_eyes_look_at_target()
 
 func render_graph() -> void:
-	# Randomize fish color
-	base_color = Color(randf(), randf(), randf())
-
+	# Don't randomize color here - it's set in _ready() and preserved during growth
 	if _mesh_instance != null:
 		_mesh_instance.queue_free()
 	if _debug_mesh_instance != null:
@@ -1109,6 +1114,15 @@ func _make_eyes_look_at_target() -> void:
 func _on_button_pressed() -> void:
 	graph = mutate_graph.mutate(graph)[0]
 	render_graph()
+
+# Grow the fish by mutating its graph
+func grow() -> void:
+	print("Fish growing! Age: ", age)
+	graph = mutate_graph.mutate(graph)[0]
+	render_graph()
+	# Re-pick destination after growth to avoid getting stuck
+	if is_moving:
+		_pick_new_destination()
 
 # ======================
 # Surface Behavior

@@ -17,6 +17,7 @@ var sea_tiles: Array[Node3D] = []
 var original_camera_transform: Transform3D
 var camera_tween: Tween = null
 var fish_rotation_tween: Tween = null
+var is_growth_sequence_active: bool = false
 
 func _ready():
 	# Allow the world to process even when paused (for camera animations)
@@ -154,7 +155,10 @@ func _on_fish_placed_in_tank():
 
 	_spawn_new_fish()
 
-	# Animate camera back to original position
+	# Start the growth sequence for existing tank fish
+	await _handle_fish_growth_sequence()
+
+	# Animate camera back to original position after growth sequence
 	_animate_camera_to_original()
 
 # Spawn a new fish in the pond/ocean
@@ -349,3 +353,109 @@ func _on_grid_cell_clicked(row: int, col: int):
 
 	print("New tank spawned at world position: ", new_tank.global_position)
 	print("Tank grid bounds: ", new_tank.get_grid_bounds() if new_tank.has_method("get_grid_bounds") else "no method")
+
+# ======================
+# Fish Growth System
+# ======================
+
+# Check if a number is a Fibonacci number
+func _is_fibonacci(n: int) -> bool:
+	if n < 1:
+		return false
+	# Generate Fibonacci numbers up to n
+	var a = 1
+	var b = 1
+	if n == 1:
+		return true
+	while b < n:
+		var temp = b
+		b = a + b
+		a = temp
+	return b == n
+
+# Get all fish from all tanks
+func _get_all_tank_fish() -> Array[Node3D]:
+	var all_fish: Array[Node3D] = []
+	# Find all fish tank nodes
+	for child in get_children():
+		if child.has_method("get") and "contained_fish" in child:
+			for fish in child.contained_fish:
+				if fish and is_instance_valid(fish) and "is_in_tank" in fish and fish.is_in_tank:
+					all_fish.append(fish)
+	return all_fish
+
+# Handle the growth sequence after placing a fish
+func _handle_fish_growth_sequence() -> void:
+	is_growth_sequence_active = true
+
+	# Get all fish in tanks
+	var tank_fish = _get_all_tank_fish()
+
+	if tank_fish.is_empty():
+		is_growth_sequence_active = false
+		return
+
+	# Increment age of all tank fish
+	var fish_to_grow: Array[Node3D] = []
+	for fish in tank_fish:
+		if "age" in fish:
+			fish.age += 1
+			print("Fish age incremented to: ", fish.age)
+
+			# Check if this fish should grow (Fibonacci age)
+			if _is_fibonacci(fish.age):
+				fish_to_grow.append(fish)
+				print("Fish at Fibonacci age ", fish.age, " will grow!")
+
+	# Animate camera to each growing fish and grow them
+	if not fish_to_grow.is_empty():
+		for fish in fish_to_grow:
+			await _animate_camera_to_fish_and_grow(fish)
+
+	is_growth_sequence_active = false
+
+# Animate camera to a specific fish, grow it, then wait
+func _animate_camera_to_fish_and_grow(fish: Node3D) -> void:
+	var camera = get_viewport().get_camera_3d()
+	if not camera or not fish:
+		return
+
+	print("Animating camera to growing fish...")
+
+	# Cancel any existing camera animation
+	if camera_tween and camera_tween.is_running():
+		camera_tween.kill()
+
+	# Calculate camera position to view this fish
+	var fish_position = fish.global_position
+	var camera_offset = Vector3(0, 3, 3)  # Above and behind the fish
+	var target_camera_position = fish_position + camera_offset
+
+	# Calculate the target rotation (basis) for looking at fish
+	var direction = (fish_position - target_camera_position).normalized()
+	var right = direction.cross(Vector3.UP).normalized()
+	var up = right.cross(direction).normalized()
+	var target_basis = Basis(right, up, -direction)
+
+	# Create the tween for camera animation to fish
+	camera_tween = create_tween()
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	camera_tween.set_ease(Tween.EASE_IN_OUT)
+	camera_tween.set_trans(Tween.TRANS_CUBIC)
+	camera_tween.set_parallel(true)
+
+	# Animate camera to fish
+	camera_tween.tween_property(camera, "global_position", target_camera_position, 0.8)
+	camera_tween.tween_property(camera, "global_transform:basis", target_basis, 0.8)
+
+	# Wait for camera to arrive
+	await camera_tween.finished
+
+	# Grow the fish
+	if fish.has_method("grow"):
+		fish.grow()
+
+	# Wait a moment to appreciate the growth (timer works during pause)
+	var growth_timer = get_tree().create_timer(1.0, true, true)  # process_always=true, process_in_physics=true
+	await growth_timer.timeout
