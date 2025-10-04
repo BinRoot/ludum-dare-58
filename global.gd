@@ -1,5 +1,7 @@
 extends Node
 
+var house_cell_size: int = 5
+
 # Item definitions
 var net_item: ItemData
 var items: Array[ItemData] = []

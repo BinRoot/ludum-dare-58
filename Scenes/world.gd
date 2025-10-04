@@ -36,6 +36,9 @@ func generate_hex_grid():
 			add_child(tile)
 			sea_tiles.append(tile)
 
+			# Connect to fish caught signal
+			tile.fish_caught.connect(_on_fish_caught)
+
 # Find all fish in the scene and pass them to all tiles
 func update_fish_references():
 	# Find all nodes with the fish script
@@ -58,3 +61,12 @@ func _find_fish_recursive(node: Node, fish_list: Array[Node3D]):
 	# Check all children
 	for child in node.get_children():
 		_find_fish_recursive(child, fish_list)
+
+func _on_fish_caught(fish: Node3D, tile: Node3D):
+	print("Fish caught at tile: ", tile.position)
+	# Remove the fish from the scene
+	if fish:
+		fish.queue_free()
+	# Consume the net from the tile (it was used to catch the fish)
+	if tile:
+		tile.consume_net()

@@ -1,9 +1,10 @@
-[gd_scene load_steps=10 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=14 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://bj2m6hkljq3ax" path="res://Scenes/player.tscn" id="1_a02cp"]
 [ext_resource type="PackedScene" uid="uid://fmoiqtua5rsi" path="res://Scenes/fish.tscn" id="3_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://dlfuaipowshr3" path="res://Scenes/hud.tscn" id="4_hud"]
+[ext_resource type="PackedScene" uid="uid://clshdani8u3d0" path="res://Scenes/fish_tank.tscn" id="5_fo5ed"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_5a7ea"]
 size = Vector3(20, 1, 30)
@@ -20,6 +21,18 @@ size = Vector2(50, 50)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8j60k"]
 albedo_color = Color(0.78431374, 0.4509804, 0, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8j60k"]
+size = Vector3(20, 1, 20)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_fo5ed"]
+size = Vector2(20, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5ukr8"]
+albedo_color = Color(0.36079627, 0.3173924, 0.11428844, 0.23529412)
+rim_enabled = true
+rim = 0.36
+rim_tint = 0.11
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_5a7ea")
@@ -61,3 +74,18 @@ mesh = SubResource("PlaneMesh_8j60k")
 surface_material_override/0 = SubResource("StandardMaterial3D_8j60k")
 
 [node name="HUD" parent="." instance=ExtResource("4_hud")]
+
+[node name="Area3D" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0.3688202, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("BoxShape3D_8j60k")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Area3D/CollisionShape3D"]
+transform = Transform3D(0.998789, 0, -0.049198404, 0, 1, 0, 0.049198404, 0, 0.998789, 0, 0, 0)
+mesh = SubResource("PlaneMesh_fo5ed")
+surface_material_override/0 = SubResource("StandardMaterial3D_5ukr8")
+
+[node name="FishTank" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("5_fo5ed")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.673955, 0, 0)
+bounds_shape = NodePath("../Area3D/CollisionShape3D")
