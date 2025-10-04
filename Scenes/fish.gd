@@ -66,7 +66,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @export var base_complexity: float = 5.0  # Graph with 4 nodes = 1.0 scale
 
 @export_group("Debug")
-@export var debug_mode: bool = true
+@export var debug_mode: bool = false
 @export var debug_spine_color: Color = Color(1.0, 0.0, 0.0)
 @export var debug_node_color: Color = Color(0.0, 1.0, 0.0)
 @export var debug_edge_color: Color = Color(0.0, 0.5, 1.0)

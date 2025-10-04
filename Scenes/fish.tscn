@@ -9,10 +9,6 @@ script = ExtResource("1_twvwo")
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.3356924)
 
-[node name="OmniLight3D" type="OmniLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.332326, 6.0395727)
-omni_range = 11.913473
-
 [node name="Control" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 0

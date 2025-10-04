@@ -8,6 +8,7 @@ extends Node3D
 
 # Preload the sea tile scene
 var sea_tile_scene = preload("res://Scenes/sea_tile.tscn")
+var sea_tiles: Array[Node3D] = []
 
 func _ready():
 	generate_hex_grid()
@@ -33,3 +34,7 @@ func generate_hex_grid():
 			# Center the grid around origin
 			tile.position = Vector3(x - offset_x, 0, z - offset_z) - Vector3(30, 0, 5)
 			add_child(tile)
+
+			# Set the fish reference for each tile
+			tile.set_fish(fish)
+			sea_tiles.append(tile)
