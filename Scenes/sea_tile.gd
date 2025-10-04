@@ -13,6 +13,9 @@ var static_body: StaticBody3D = null
 var caught_fish: Array[Node3D] = []  # Track fish that have already been caught
 var celebration_tween: Tween = null
 var original_y_position: float = 0.0
+var is_casting_net: bool = false
+var casting_tween: Tween = null
+var casting_visual: MeshInstance3D = null
 
 # Attach to a Node3D, or run in an editor utility script
 func _ready():
@@ -114,11 +117,33 @@ func _handle_click():
 	if has_net:
 		# Pick up the net
 		pickup_net()
-	else:
-		# Try to place a net
-		place_net()
+	elif not is_casting_net:
+		# Start casting a net
+		start_casting_net()
+
+func start_casting_net():
+	# Check if player has a net available
+	if not Global.use_item("net"):
+		return  # No net available
+
+	is_casting_net = true
+	_create_casting_visual()
+
+	# Create a tween for the 1-second delay
+	if casting_tween and casting_tween.is_running():
+		casting_tween.kill()
+
+	casting_tween = create_tween()
+	casting_tween.tween_callback(_complete_net_cast).set_delay(1.0)
+
+func _complete_net_cast():
+	is_casting_net = false
+	has_net = true
+	_remove_casting_visual()
+	_create_net_visual()
 
 func place_net() -> bool:
+	# This function is now only used for immediate placement (if needed elsewhere)
 	if Global.use_item("net"):
 		has_net = true
 		_create_net_visual()
@@ -190,6 +215,50 @@ func _remove_net_visual():
 	if net_visual != null:
 		net_visual.queue_free()
 		net_visual = null
+
+func _create_casting_visual():
+	if casting_visual == null:
+		casting_visual = MeshInstance3D.new()
+
+		# Create an expanding ring effect for casting
+		var ring_mesh = TorusMesh.new()
+		ring_mesh.inner_radius = hex_radius * 0.3
+		ring_mesh.outer_radius = hex_radius * 0.5
+		ring_mesh.rings = 6
+		ring_mesh.ring_segments = 6
+		casting_visual.mesh = ring_mesh
+
+		# Create a glowing animated material
+		var cast_material = StandardMaterial3D.new()
+		cast_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cast_material.albedo_color = Color(1, 1, 1, 0.8)
+		cast_material.emission_enabled = true
+		cast_material.emission = Color(0.4, 0.8, 1.0)
+		cast_material.emission_energy_multiplier = 2.0
+		cast_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		casting_visual.set_surface_override_material(0, cast_material)
+
+		# Position it just above the water surface
+		casting_visual.position = Vector3(0, 0.6, 0)
+		casting_visual.rotation.x = -PI / 2  # Rotate to lie flat
+		add_child(casting_visual)
+
+		# Animate the casting visual - pulsing and expanding
+		var cast_anim_tween = create_tween()
+		cast_anim_tween.set_loops()  # Loop until removed
+		cast_anim_tween.set_parallel(true)
+
+		# Pulsing scale animation
+		cast_anim_tween.tween_property(casting_visual, "scale", Vector3(1.3, 1.3, 1.3), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		cast_anim_tween.tween_property(casting_visual, "scale", Vector3(0.7, 0.7, 0.7), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE).set_delay(0.5)
+
+		# Rotating animation
+		cast_anim_tween.tween_property(casting_visual, "rotation:z", TAU, 1.0)
+
+func _remove_casting_visual():
+	if casting_visual != null:
+		casting_visual.queue_free()
+		casting_visual = null
 
 # Celebrate catching a fish with dramatic visual effects
 func _celebrate_catch():
