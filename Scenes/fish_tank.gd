@@ -262,7 +262,11 @@ func update_position():
 	var local_z = row * cell_size + (height * cell_size / 2.0)
 
 	# Position relative to boundary origin
+	var old_position = position
 	position = boundary_origin + Vector3(local_x, 0, local_z)
+
+	# Update fish positions if any fish are in the tank
+	_update_fish_positions(old_position)
 
 func _on_mouse_entered():
 	is_hovered = true
@@ -350,7 +354,10 @@ func _end_drag():
 
 func _process(_delta):
 	if is_dragging:
+		var old_position = position
 		_update_drag_position()
+		# Update fish positions to follow the tank
+		_update_fish_positions(old_position)
 		# Update visual feedback based on collision state
 		_update_drag_visual_feedback()
 
@@ -511,3 +518,20 @@ func _create_tank_bounds() -> CollisionShape3D:
 
 	add_child(bounds)
 	return bounds
+
+# Update fish positions when the tank moves
+func _update_fish_positions(old_tank_position: Vector3):
+	if contained_fish.is_empty():
+		return
+
+	# Calculate the position delta
+	var position_delta = position - old_tank_position
+
+	# Move all fish by the same delta
+	for fish in contained_fish:
+		if fish and is_instance_valid(fish):
+			fish.global_position += position_delta
+
+			# If fish is currently moving to a target, update the target too
+			if fish.has_method("get") and "current_target" in fish:
+				fish.current_target += position_delta

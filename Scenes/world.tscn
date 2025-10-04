@@ -36,13 +36,16 @@ rim = 0.36
 rim_tint = 0.11
 refraction_enabled = true
 
-[node name="World" type="Node3D"]
+[node name="World" type="Node3D" node_paths=PackedStringArray("pond_bounds", "tank_area")]
 script = ExtResource("1_5a7ea")
+pond_bounds = NodePath("Pond/CollisionShape3D")
+tank_area = NodePath("Area3D")
 
 [node name="Player" parent="." instance=ExtResource("1_a02cp")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.352211, 0)
 
 [node name="Camera3D" type="Camera3D" parent="."]
+process_mode = 3
 transform = Transform3D(0.9986295, 0.051956907, -0.006287475, 0, 0.120136805, 0.9927573, 0.05233596, -0.9913968, 0.11997216, 0, 19.607, 1)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]

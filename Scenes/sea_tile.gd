@@ -11,9 +11,13 @@ var has_net: bool = false
 var net_visual: MeshInstance3D = null
 var static_body: StaticBody3D = null
 var caught_fish: Array[Node3D] = []  # Track fish that have already been caught
+var celebration_tween: Tween = null
+var original_y_position: float = 0.0
 
 # Attach to a Node3D, or run in an editor utility script
 func _ready():
+	# Store the original Y position for celebration animation
+	original_y_position = position.y
 	var radius := 2            # hex face "radius" (center to corner)
 	var length := 1.0           # how long you want it
 	var mesh := CylinderMesh.new()
@@ -91,6 +95,7 @@ func _process(_delta):
 					if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish:  # Fish is in the center area
 						caught_fish.append(fish_ref)
 						fish_caught.emit(fish_ref, self)
+						_celebrate_catch()
 
 		material.set_shader_parameter("fish_under", max_is_under)
 
@@ -185,3 +190,72 @@ func _remove_net_visual():
 	if net_visual != null:
 		net_visual.queue_free()
 		net_visual = null
+
+# Celebrate catching a fish with dramatic visual effects
+func _celebrate_catch():
+	# Cancel any existing celebration animation
+	if celebration_tween and celebration_tween.is_running():
+		celebration_tween.kill()
+
+	# Create a new tween for the celebration animation
+	celebration_tween = create_tween()
+	celebration_tween.set_parallel(true)  # Run all animations at the same time
+
+	# BOUNCE ANIMATION - rise up and settle down
+	var bounce_height = 0.8
+	celebration_tween.tween_property(self, "position:y", original_y_position + bounce_height, 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	celebration_tween.tween_property(self, "position:y", original_y_position, 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_ELASTIC).set_delay(0.3)
+
+	# SCALE ANIMATION - pulse effect
+	var original_scale = scale
+	celebration_tween.tween_property(self, "scale", original_scale * 1.3, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	celebration_tween.tween_property(self, "scale", original_scale, 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_ELASTIC).set_delay(0.25)
+
+	# COLOR FLASH - create a vibrant flash effect with shader or overlay
+	_create_celebration_flash()
+
+	# Clean up parallel mode for next animation
+	celebration_tween.chain()
+
+# Create a visual flash effect for celebration
+func _create_celebration_flash():
+	# Create a bright, colorful overlay mesh
+	var flash_mesh = MeshInstance3D.new()
+	var cylinder = CylinderMesh.new()
+	cylinder.top_radius = hex_radius * 1.2
+	cylinder.bottom_radius = hex_radius * 1.2
+	cylinder.height = 0.1
+	cylinder.radial_segments = 6
+	flash_mesh.mesh = cylinder
+
+	# Create vibrant glowing material
+	var flash_material = StandardMaterial3D.new()
+	flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flash_material.albedo_color = Color(1.0, 0.8, 0.2, 1.0)  # Golden yellow
+	flash_material.emission_enabled = true
+	flash_material.emission = Color(1.0, 0.9, 0.3)
+	flash_material.emission_energy_multiplier = 3.0
+	flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flash_mesh.set_surface_override_material(0, flash_material)
+
+	# Position it at the tile
+	flash_mesh.position = Vector3(0, 0.6, 0)
+	add_child(flash_mesh)
+
+	# Animate the flash - grow and fade out
+	var flash_tween = create_tween()
+	flash_tween.set_parallel(true)
+
+	# Scale up
+	flash_tween.tween_property(flash_mesh, "scale", Vector3(1.5, 1.0, 1.5), 0.5).set_ease(Tween.EASE_OUT)
+
+	# Fade out by animating the material's albedo alpha
+	flash_tween.tween_property(flash_material, "albedo_color:a", 0.0, 0.5).set_ease(Tween.EASE_IN)
+
+	# Color shift from gold to white to cyan
+	flash_tween.tween_property(flash_material, "albedo_color", Color(0.3, 0.8, 1.0, 0.0), 0.5)
+	flash_tween.tween_property(flash_material, "emission", Color(0.3, 0.9, 1.0), 0.5)
+
+	# Clean up after animation
+	flash_tween.chain()
+	flash_tween.tween_callback(flash_mesh.queue_free)

@@ -89,7 +89,7 @@ var next_surface_time: float = 0.0
 @export var surface_interval_min: float = 2.0  # Minimum time between surfaces
 @export var surface_interval_max: float = 8.0  # Maximum time between surfaces
 @export var surface_duration: float = 1.0  # How long the fish stays visible at surface
-@export var surface_look_angle: float = 90.0  # Degrees to look up when surfacing
+@export var surface_look_angle: float = 0.0  # Degrees to look up when surfacing
 
 var _mesh_instance: MeshInstance3D
 var _debug_mesh_instance: MeshInstance3D
