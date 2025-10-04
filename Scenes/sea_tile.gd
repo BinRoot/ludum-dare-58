@@ -2,7 +2,7 @@ extends Node3D
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 var material: ShaderMaterial
-var fish_ref: Node3D = null
+var fish_refs: Array[Node3D] = []  # Track multiple fish
 var hex_radius: float = 2.0  # Must match the radius used in _ready
 var is_hovered: bool = false
 
@@ -50,32 +50,37 @@ func _ready():
 	static_body.mouse_entered.connect(_on_mouse_entered)
 	static_body.mouse_exited.connect(_on_mouse_exited)
 
-func set_fish(fish: Node3D):
-	fish_ref = fish
+func add_fish(fish: Node3D):
+	if fish and not fish in fish_refs:
+		fish_refs.append(fish)
 
 func _process(_delta):
 	if material:
 		# Update hover highlight
 		material.set_shader_parameter("hover_highlight", 1.0 if is_hovered else 0.0)
 
-		if fish_ref:
-			# Calculate if fish is near this tile
-			var tile_pos = global_position
-			var fish_pos = fish_ref.global_position
+		# Check all fish and use the maximum shadow effect
+		var max_is_under = 0.0
+		var tile_pos = global_position
 
-			# Calculate distance in x,z plane
-			var dx = fish_pos.x - tile_pos.x
-			var dz = fish_pos.z - tile_pos.z
-			var dist_xz = sqrt(dx * dx + dz * dz)
+		for fish_ref in fish_refs:
+			if fish_ref:
+				# Calculate if fish is near this tile
+				var fish_pos = fish_ref.global_position
 
-			# Check if fish is within hex radius and near the tile's Y level
-			var is_under = 0.0
-			var y_diff = abs(fish_pos.y - tile_pos.y)
-			if dist_xz < hex_radius and y_diff < 3.0:  # Within 3 units vertically
-				# Calculate shadow intensity based on distance (center = darker, edge = lighter)
-				is_under = 1.0 - (dist_xz / hex_radius)
+				# Calculate distance in x,z plane
+				var dx = fish_pos.x - tile_pos.x
+				var dz = fish_pos.z - tile_pos.z
+				var dist_xz = sqrt(dx * dx + dz * dz)
 
-			material.set_shader_parameter("fish_under", is_under)
+				# Check if fish is within hex radius and near the tile's Y level
+				var y_diff = abs(fish_pos.y - tile_pos.y)
+				if dist_xz < hex_radius and y_diff < 3.0:  # Within 3 units vertically
+					# Calculate shadow intensity based on distance (center = darker, edge = lighter)
+					var is_under = 1.0 - (dist_xz / hex_radius)
+					max_is_under = max(max_is_under, is_under)
+
+		material.set_shader_parameter("fish_under", max_is_under)
 
 func _on_mouse_entered():
 	is_hovered = true
