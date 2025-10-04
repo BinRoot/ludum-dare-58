@@ -10,6 +10,7 @@ extends Node3D
 # Preload scenes
 var sea_tile_scene = preload("res://Scenes/sea_tile.tscn")
 var fish_scene = preload("res://Scenes/fish.tscn")
+var fish_tank_scene = preload("res://Scenes/fish_tank.tscn")
 var sea_tiles: Array[Node3D] = []
 
 # Camera animation
@@ -30,6 +31,11 @@ func _ready():
 
 	# Connect to fish placement signal to spawn new fish
 	Global.fish_placed_in_tank.connect(_on_fish_placed_in_tank)
+
+	# Connect to grid visualizer for tank purchases
+	var grid_visualizer = get_node_or_null("GridVisualizer")
+	if grid_visualizer and grid_visualizer.has_signal("cell_clicked"):
+		grid_visualizer.cell_clicked.connect(_on_grid_cell_clicked)
 
 func generate_hex_grid():
 	var hex_width = hex_radius * 1.0
@@ -85,6 +91,10 @@ func _on_fish_caught(fish: Node3D, tile: Node3D):
 
 	# Remove all nets from all tiles and return 3 nets to inventory
 	_remove_all_nets_and_return_to_inventory()
+
+	# Reward the player with clams for catching a fish
+	Global.add_clams(10)
+	print("Earned 10 clams! Total: ", Global.get_clams())
 
 	# Show the fish close to camera and ask user to select a tank
 	if fish:
@@ -266,3 +276,31 @@ func _animate_camera_to_original():
 	# Animate camera back to original position and rotation
 	camera_tween.tween_property(camera, "global_position", original_camera_transform.origin, 1.0)
 	camera_tween.tween_property(camera, "global_transform:basis", original_camera_transform.basis, 1.0)
+
+# Called when a grid cell is clicked to buy a tank
+func _on_grid_cell_clicked(row: int, col: int):
+	print("=== Spawning new tank at row: ", row, " col: ", col, " ===")
+
+	# Instantiate a new fish tank
+	var new_tank = fish_tank_scene.instantiate()
+
+	# Set the tank's grid position BEFORE adding to scene
+	new_tank.row = row
+	new_tank.col = col
+
+	# Set the bounds reference (same as existing tank)
+	new_tank.bounds_shape = tank_area
+
+	if tank_area:
+		print("Tank area position: ", tank_area.global_position)
+	else:
+		print("Tank area position: null")
+
+	# Add to the scene
+	add_child(new_tank)
+
+	# Wait for the tank to be ready and positioned
+	await get_tree().process_frame
+
+	print("New tank spawned at world position: ", new_tank.global_position)
+	print("Tank grid bounds: ", new_tank.get_grid_bounds() if new_tank.has_method("get_grid_bounds") else "no method")

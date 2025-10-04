@@ -9,6 +9,10 @@ var items: Array[ItemData] = []
 # Inventory tracking (item_id -> count)
 var inventory: Dictionary = {}
 
+# Money system
+var clams: int = 0
+signal clams_changed
+
 # Signal to notify when inventory changes
 signal inventory_changed
 
@@ -33,6 +37,10 @@ func _ready():
 	inventory["net"] = 3
 	inventory_changed.emit()
 
+	# Start with 15 clams
+	clams = 15
+	clams_changed.emit()
+
 func use_item(item_id: StringName) -> bool:
 	if inventory.get(item_id, 0) > 0:
 		inventory[item_id] -= 1
@@ -52,3 +60,18 @@ func get_item_data(item_id: StringName) -> ItemData:
 		if item.id == item_id:
 			return item
 	return null
+
+# Money management functions
+func add_clams(amount: int):
+	clams += amount
+	clams_changed.emit()
+
+func spend_clams(amount: int) -> bool:
+	if clams >= amount:
+		clams -= amount
+		clams_changed.emit()
+		return true
+	return false
+
+func get_clams() -> int:
+	return clams

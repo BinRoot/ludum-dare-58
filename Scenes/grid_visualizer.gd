@@ -5,16 +5,28 @@ extends Node3D
 @export var grid_color: Color = Color(0.8, 0.7, 1, 0.6)
 @export var show_grid: bool = true
 @export var bounds_shape: Node3D  # Reference to boundary (same as fish tanks)
+@export var tank_cost: int = 5  # Cost of a tank in clams
 
 var mesh_instance: MeshInstance3D
 var cell_size: float = 1.0
 var boundary_origin: Vector3 = Vector3.ZERO
+
+# Interaction
+var interaction_area: Area3D
+var hovered_cell: Vector2i = Vector2i(-1, -1)
+var cost_label: Label3D = null
+var is_mouse_over_grid: bool = false
+
+# Signals
+signal cell_clicked(row: int, col: int)
 
 func _ready():
 	grid_size = Global.house_cell_size
 	_calculate_cell_size_from_boundary()
 	_position_at_boundary()
 	_create_grid_visual()
+	_setup_interaction()
+	_create_cost_label()
 
 func _position_at_boundary():
 	# Position the grid at the boundary's location
@@ -117,3 +129,217 @@ func toggle_grid():
 	show_grid = !show_grid
 	if mesh_instance:
 		mesh_instance.visible = show_grid
+
+func _setup_interaction():
+	# Create an Area3D for mouse interaction (better for input events)
+	interaction_area = Area3D.new()
+	interaction_area.input_ray_pickable = true
+	interaction_area.collision_layer = 16  # Use layer 16 to avoid conflicts
+	interaction_area.collision_mask = 0
+	interaction_area.monitorable = false  # Don't need physics monitoring
+	interaction_area.monitoring = false
+	add_child(interaction_area)
+
+	# Create collision shape covering the entire grid
+	# Put it below the tanks so tank collision is detected first
+	var collision = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	var total_size_x = grid_size * cell_size
+	var total_size_z = grid_size * cell_size
+	shape.size = Vector3(total_size_x, 0.01, total_size_z)  # Very thin at ground level
+	collision.shape = shape
+	# Position it just at ground level
+	collision.position = Vector3(total_size_x / 2.0, 0.005, total_size_z / 2.0)
+	interaction_area.add_child(collision)
+
+	# Set lower priority so tanks get input events first
+	interaction_area.priority = -1
+
+	# Connect signals
+	interaction_area.input_event.connect(_on_input_event)
+	interaction_area.mouse_entered.connect(_on_mouse_entered)
+	interaction_area.mouse_exited.connect(_on_mouse_exited)
+
+	print("Grid interaction setup - Area3D at:", interaction_area.global_position, " collision size:", shape.size)
+
+func _create_cost_label():
+	cost_label = Label3D.new()
+	cost_label.text = "Cost: " + str(tank_cost) + " clams"
+	cost_label.font_size = 32
+	cost_label.modulate = Color.YELLOW
+	cost_label.outline_modulate = Color.BLACK
+	cost_label.outline_size = 4
+	cost_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	cost_label.visible = false
+	cost_label.pixel_size = 0.03  # Larger = more visible (was 0.01, now 0.005 which counterintuitively makes it bigger)
+	cost_label.no_depth_test = true  # Always render on top
+	cost_label.render_priority = 10  # Render after other objects
+	add_child(cost_label)
+	print("Cost label created at grid position: ", global_position)
+
+func _on_mouse_entered():
+	is_mouse_over_grid = true
+
+func _on_mouse_exited():
+	is_mouse_over_grid = false
+	hovered_cell = Vector2i(-1, -1)
+	if cost_label:
+		cost_label.visible = false
+
+func _on_input_event(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _shape_idx: int):
+	print("_on_input_event called, event type:", event.get_class())
+	if event is InputEventMouseButton:
+		print("Mouse button event - button:", event.button_index, " pressed:", event.pressed)
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			# Don't allow buying during tank selection mode
+			if Global.is_selecting_tank:
+				print("Cannot buy - tank selection mode active")
+				return
+
+			# Use hovered_cell if available (more reliable)
+			if hovered_cell.x >= 0 and hovered_cell.y >= 0:
+				var row = hovered_cell.y
+				var col = hovered_cell.x
+
+				# Check if this cell is occupied by a tank
+				# If it is, don't handle the event - let it pass through to the tank
+				if _is_cell_occupied(row, col):
+					print("Cell occupied by tank - passing event through for tank interaction")
+					return  # Don't consume the event
+
+				print("Clicked on empty cell row:", row, " col:", col)
+				_try_buy_tank(row, col)
+			else:
+				# Fallback: Convert world position to grid coordinates
+				# event_position is relative to the collision shape center, not the grid origin
+				# We need to account for the collision shape offset
+				var total_size_x = grid_size * cell_size
+				var total_size_z = grid_size * cell_size
+				var shape_offset = Vector3(total_size_x / 2.0, 0, total_size_z / 2.0)
+				var local_pos = event_position + global_position - (global_position + shape_offset)
+				var col = int(local_pos.x / cell_size)
+				var row = int(local_pos.z / cell_size)
+
+				print("Clicked (fallback) on cell row:", row, " col:", col)
+
+				# Check if within grid bounds
+				if col >= 0 and col < grid_size and row >= 0 and row < grid_size:
+					# Check if occupied before trying to buy
+					if not _is_cell_occupied(row, col):
+						_try_buy_tank(row, col)
+
+func _try_buy_tank(row: int, col: int):
+	print("=== _try_buy_tank called for row:", row, " col:", col, " ===")
+
+	# Check if cell is already occupied
+	var is_occupied = _is_cell_occupied(row, col)
+	print("Cell occupied check:", is_occupied)
+	if is_occupied:
+		print("Cell already occupied!")
+		return
+
+	# Check if player has enough clams
+	var current_clams = Global.get_clams()
+	print("Current clams:", current_clams, " Tank cost:", tank_cost)
+	if current_clams < tank_cost:
+		print("Not enough clams! Need ", tank_cost, " but have ", current_clams)
+		return
+
+	# Spend clams and emit signal to spawn tank
+	print("Attempting to spend", tank_cost, "clams...")
+	var spent = Global.spend_clams(tank_cost)
+	print("Spend successful:", spent)
+	if spent:
+		print("Emitting cell_clicked signal for row:", row, " col:", col)
+		cell_clicked.emit(row, col)
+		print("Signal emitted, new clam balance:", Global.get_clams())
+
+func _is_cell_occupied(row: int, col: int) -> bool:
+	# Check if any fish tank overlaps with this cell
+	# Access the static tank list from FishTank class
+	var fish_tank_script = load("res://Scenes/fish_tank.gd")
+	if fish_tank_script and "all_tanks" in fish_tank_script:
+		var all_tanks = fish_tank_script.all_tanks
+		for tank in all_tanks:
+			if tank and is_instance_valid(tank) and tank.has_method("get_grid_bounds"):
+				var bounds = tank.get_grid_bounds()
+				# Check if this cell is within the tank's bounds
+				if row >= bounds.row and row < bounds.row + bounds.height:
+					if col >= bounds.col and col < bounds.col + bounds.width:
+						return true
+	return false
+
+func _process(_delta):
+	# Don't show cost label during tank selection mode
+	if Global.is_selecting_tank:
+		if cost_label:
+			cost_label.visible = false
+		return
+
+	# Update hovered cell and cost label position using simple plane intersection
+	var camera = get_viewport().get_camera_3d()
+	if not camera:
+		return
+
+	var mouse_pos = get_viewport().get_mouse_position()
+	var from = camera.project_ray_origin(mouse_pos)
+	var dir = camera.project_ray_normal(mouse_pos)
+
+	# Intersect with a plane at the grid's height
+	var plane = Plane(Vector3.UP, global_position.y)
+	var hit = plane.intersects_ray(from, dir)
+
+	if hit:
+		# Convert to local position relative to grid origin
+		var local_pos = hit - global_position
+		var col = int(local_pos.x / cell_size)
+		var row = int(local_pos.z / cell_size)
+
+
+		# Check if within grid bounds
+		if col >= 0 and col < grid_size and row >= 0 and row < grid_size:
+			hovered_cell = Vector2i(col, row)
+
+			# Update cost label
+			if cost_label:
+				# Position at center of hovered cell, elevated above the ground
+				var cell_center = Vector3(
+					col * cell_size + cell_size / 2.0,
+					2.0,  # Raised higher so it's visible above tanks
+					row * cell_size + cell_size / 2.0
+				)
+				cost_label.global_position = global_position + cell_center
+
+				# Only show if cell is not occupied
+				if not _is_cell_occupied(row, col):
+					cost_label.text = "Cost: " + str(tank_cost) + " clams"
+					if Global.get_clams() >= tank_cost:
+						cost_label.modulate = Color.GREEN
+					else:
+						cost_label.modulate = Color.RED
+					cost_label.visible = true
+				else:
+					cost_label.visible = false
+		else:
+			hovered_cell = Vector2i(-1, -1)
+			if cost_label:
+				cost_label.visible = false
+	else:
+		hovered_cell = Vector2i(-1, -1)
+		if cost_label:
+			cost_label.visible = false
+
+func _unhandled_input(event: InputEvent):
+	# Global click handler so empty cells can be purchased even if Area3D doesn't catch it
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			# Don't allow buying during tank selection mode
+			if Global.is_selecting_tank:
+				return
+
+			# If we have a valid hovered cell and it's empty, try to buy
+			if hovered_cell.x >= 0 and hovered_cell.y >= 0:
+				var row = hovered_cell.y
+				var col = hovered_cell.x
+				if not _is_cell_occupied(row, col):
+					_try_buy_tank(row, col)
