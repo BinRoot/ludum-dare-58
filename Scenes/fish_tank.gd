@@ -506,8 +506,14 @@ func _sell_this_tank():
 			fish.queue_free()
 	contained_fish.clear()
 
+	# Schedule game over check for next frame (before removing tank)
+	call_deferred("_check_game_over_deferred")
+
 	# Remove this tank from scene
 	queue_free()
+
+func _check_game_over_deferred():
+	Global.call_deferred("check_game_over")
 
 func _check_collision() -> bool:
 	# Check if this tank overlaps with any other tank
@@ -837,6 +843,10 @@ func _break_tank():
 
 	# Destroy the tank after a delay (let fish animations play)
 	await get_tree().create_timer(3.0).timeout
+
+	# Schedule game over check for next frame (before removing tank)
+	call_deferred("_check_game_over_deferred")
+
 	queue_free()
 
 # Create visual effect for tank breaking

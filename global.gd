@@ -13,6 +13,10 @@ var inventory: Dictionary = {}
 var clams: int = 0
 signal clams_changed
 
+# Game over state
+var is_game_over: bool = false
+signal game_over
+
 # Signal to notify when inventory changes
 signal inventory_changed
 
@@ -131,3 +135,29 @@ func spend_clams(amount: int) -> bool:
 
 func get_clams() -> int:
 	return clams
+
+# Check for game over condition
+func check_game_over() -> bool:
+	if is_game_over:
+		return true
+
+	# Load the fish tank script to access all_tanks
+	var fish_tank_script = load("res://Scenes/fish_tank.gd")
+	if not fish_tank_script or not "all_tanks" in fish_tank_script:
+		return false
+
+	var all_tanks = fish_tank_script.all_tanks
+	var tank_count = 0
+
+	# Count valid tanks
+	for tank in all_tanks:
+		if tank and is_instance_valid(tank):
+			tank_count += 1
+
+	# Game over if no tanks and can't afford to buy one
+	if tank_count == 0 and clams < 5:
+		is_game_over = true
+		game_over.emit()
+		return true
+
+	return false

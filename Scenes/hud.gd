@@ -6,6 +6,9 @@ var inventory_items: Dictionary = {}  # item_id -> Array of InventoryItem nodes
 
 var tank_selection_label: Label = null
 var clams_label: Label = null
+var game_over_panel: Panel = null
+var game_over_label: Label = null
+var restart_button: Button = null
 
 func _ready():
 	# Allow the HUD to continue processing while the game is paused
@@ -17,11 +20,15 @@ func _ready():
 	Global.fish_placed_in_tank.connect(_on_fish_placed)
 	# Connect to clams changes
 	Global.clams_changed.connect(_on_clams_changed)
+	# Connect to game over signal
+	Global.game_over.connect(_on_game_over)
 
 	# Create the tank selection label
 	_create_tank_selection_label()
 	# Create the clams label
 	_create_clams_label()
+	# Create the game over screen
+	_create_game_over_screen()
 
 	# Initial update
 	_on_inventory_changed()
@@ -83,6 +90,121 @@ func _create_clams_label():
 func _on_clams_changed():
 	if clams_label:
 		clams_label.text = "Clams: " + str(Global.get_clams())
+
+func _create_game_over_screen():
+	# Create a semi-transparent dark panel that covers the screen
+	game_over_panel = Panel.new()
+	game_over_panel.anchor_left = 0.0
+	game_over_panel.anchor_right = 1.0
+	game_over_panel.anchor_top = 0.0
+	game_over_panel.anchor_bottom = 1.0
+	game_over_panel.visible = false
+
+	# Style the panel
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = Color(0.0, 0.0, 0.0, 0.8)
+	game_over_panel.add_theme_stylebox_override("panel", style_box)
+
+	add_child(game_over_panel)
+
+	# Create game over label
+	game_over_label = Label.new()
+	game_over_label.text = "GAME OVER\n\nYou have no tanks and no money!"
+	game_over_label.add_theme_font_size_override("font_size", 48)
+	game_over_label.add_theme_color_override("font_color", Color.RED)
+	game_over_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	game_over_label.add_theme_constant_override("outline_size", 8)
+	game_over_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	game_over_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	game_over_label.anchor_left = 0.0
+	game_over_label.anchor_right = 1.0
+	game_over_label.anchor_top = 0.2
+	game_over_label.anchor_bottom = 0.5
+
+	game_over_panel.add_child(game_over_label)
+
+	# Create restart button
+	restart_button = Button.new()
+	restart_button.text = "RESTART"
+	restart_button.custom_minimum_size = Vector2(300, 80)
+	restart_button.add_theme_font_size_override("font_size", 36)
+
+	# Style the button
+	var button_normal = StyleBoxFlat.new()
+	button_normal.bg_color = Color(0.8, 0.2, 0.2, 0.9)
+	button_normal.border_color = Color(1.0, 0.3, 0.3, 1.0)
+	button_normal.set_border_width_all(3)
+	button_normal.corner_radius_top_left = 10
+	button_normal.corner_radius_top_right = 10
+	button_normal.corner_radius_bottom_left = 10
+	button_normal.corner_radius_bottom_right = 10
+	restart_button.add_theme_stylebox_override("normal", button_normal)
+
+	var button_hover = StyleBoxFlat.new()
+	button_hover.bg_color = Color(1.0, 0.3, 0.3, 1.0)
+	button_hover.border_color = Color(1.0, 0.5, 0.5, 1.0)
+	button_hover.set_border_width_all(3)
+	button_hover.corner_radius_top_left = 10
+	button_hover.corner_radius_top_right = 10
+	button_hover.corner_radius_bottom_left = 10
+	button_hover.corner_radius_bottom_right = 10
+	restart_button.add_theme_stylebox_override("hover", button_hover)
+
+	var button_pressed = StyleBoxFlat.new()
+	button_pressed.bg_color = Color(0.6, 0.1, 0.1, 1.0)
+	button_pressed.border_color = Color(0.8, 0.2, 0.2, 1.0)
+	button_pressed.set_border_width_all(3)
+	button_pressed.corner_radius_top_left = 10
+	button_pressed.corner_radius_top_right = 10
+	button_pressed.corner_radius_bottom_left = 10
+	button_pressed.corner_radius_bottom_right = 10
+	restart_button.add_theme_stylebox_override("pressed", button_pressed)
+
+	# Position the button horizontally centered, but lower vertically
+	restart_button.anchor_left = 0.5
+	restart_button.anchor_right = 0.5
+	restart_button.anchor_top = 0.65
+	restart_button.anchor_bottom = 0.65
+	restart_button.offset_left = -150
+	restart_button.offset_right = 150
+	restart_button.offset_top = -40
+	restart_button.offset_bottom = 40
+
+	# Connect button signal
+	restart_button.pressed.connect(_on_restart_pressed)
+
+	game_over_panel.add_child(restart_button)
+
+func _on_game_over():
+	print("Game Over!")
+	if game_over_panel:
+		game_over_panel.visible = true
+	# Pause the game
+	get_tree().paused = true
+
+func _on_restart_pressed():
+	print("Restarting game...")
+	# Reset the global state completely
+	_reset_game_state()
+	# Unpause and reload the scene
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+func _reset_game_state():
+	# Reset game over flag
+	Global.is_game_over = false
+
+	# Reset money to starting amount
+	Global.clams = 15
+
+	# Reset inventory to starting items
+	Global.inventory.clear()
+	Global.inventory["net"] = 3
+
+	# Clear any caught fish state
+	Global.caught_fish = null
+	Global.is_selecting_tank = false
+	Global.globally_caught_fish.clear()
 
 func _on_inventory_changed():
 	# Update inventory displays for each item type

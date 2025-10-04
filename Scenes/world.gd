@@ -39,6 +39,16 @@ func _ready():
 	if grid_visualizer and grid_visualizer.has_signal("cell_clicked"):
 		grid_visualizer.cell_clicked.connect(_on_grid_cell_clicked)
 
+	# Set up periodic game over check
+	_setup_game_over_check()
+
+func _setup_game_over_check():
+	# Check for game over every few seconds
+	while true:
+		await get_tree().create_timer(2.0).timeout
+		if not Global.is_game_over:
+			Global.check_game_over()
+
 func generate_hex_grid():
 	var hex_width = hex_radius * 1.0
 	var hex_height = hex_radius * sqrt(3.0)

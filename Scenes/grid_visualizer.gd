@@ -312,6 +312,9 @@ func _try_buy_tank(row: int, col: int):
 		cell_clicked.emit(row, col)
 		print("Signal emitted, new clam balance:", Global.get_clams())
 
+		# Check for game over after spending money (deferred to next frame)
+		Global.call_deferred("check_game_over")
+
 func _is_cell_occupied(row: int, col: int) -> bool:
 	# Check if any fish tank overlaps with this cell
 	# Access the static tank list from FishTank class
