@@ -41,6 +41,9 @@ var current_capacity: float = 0.0  # Current capacity based on fish volumes
 var capacity_bar: ProgressBar = null  # UI progress bar for capacity
 var capacity_bar_container: Control = null  # Container for the progress bar
 
+# Combine button system
+var combine_buttons: Dictionary = {}  # Maps adjacent tank to button node
+
 func _ready():
 	# Allow fish tanks to be interactive even when the game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -59,6 +62,9 @@ func _ready():
 
 	# Update position based on grid coordinates
 	update_position()
+
+	# Check for adjacent tanks and create combine buttons
+	_update_combine_buttons()
 
 func _calculate_cell_size_from_boundary():
 	if not bounds_shape:
@@ -117,6 +123,9 @@ func _get_boundary_size() -> Vector3:
 func _exit_tree():
 	# Remove from global list when deleted
 	all_tanks.erase(self)
+
+	# Clean up all combine buttons
+	_cleanup_combine_buttons()
 
 func _create_tank_visual():
 	# Create the glass tank body
@@ -385,6 +394,9 @@ func _end_drag():
 		# If dropped over sell tile, execute sale
 		if _is_over_sell_tile():
 			_sell_this_tank()
+		else:
+			# Update combine buttons after moving
+			_update_all_tanks_combine_buttons()
 
 func _process(_delta):
 	if is_dragging:
@@ -394,6 +406,9 @@ func _process(_delta):
 		_update_fish_positions(old_position)
 		# Update visual feedback based on collision state
 		_update_drag_visual_feedback()
+
+	# Update combine button positions every frame
+	_update_combine_button_positions()
 
 func _input(event: InputEvent):
 	# Handle mouse button release globally (not just when over the tank)
@@ -905,3 +920,303 @@ func _kill_fish(fish: Node3D):
 	# Delete fish after animation
 	death_tween.chain()
 	death_tween.tween_callback(fish.queue_free)
+
+# ===========================
+# Combine Button System
+# ===========================
+
+# Check if two tanks share a side (are adjacent)
+func _tanks_share_side(tank_a: Dictionary, tank_b: Dictionary) -> bool:
+	var a_row: int = tank_a.row
+	var a_col: int = tank_a.col
+	var a_width: int = tank_a.width
+	var a_height: int = tank_a.height
+
+	var b_row: int = tank_b.row
+	var b_col: int = tank_b.col
+	var b_width: int = tank_b.width
+	var b_height: int = tank_b.height
+
+	# Check horizontal adjacency (side by side)
+	# Tank B is to the right of Tank A
+	if a_col + a_width == b_col:
+		# Check if they share any rows
+		var a_row_end = a_row + a_height
+		var b_row_end = b_row + b_height
+		if not (a_row >= b_row_end or b_row >= a_row_end):
+			return true
+
+	# Tank A is to the right of Tank B
+	if b_col + b_width == a_col:
+		var a_row_end = a_row + a_height
+		var b_row_end = b_row + b_height
+		if not (a_row >= b_row_end or b_row >= a_row_end):
+			return true
+
+	# Check vertical adjacency (one above/below the other)
+	# Tank B is below Tank A
+	if a_row + a_height == b_row:
+		# Check if they share any columns
+		var a_col_end = a_col + a_width
+		var b_col_end = b_col + b_width
+		if not (a_col >= b_col_end or b_col >= a_col_end):
+			return true
+
+	# Tank A is below Tank B
+	if b_row + b_height == a_row:
+		var a_col_end = a_col + a_width
+		var b_col_end = b_col + b_width
+		if not (a_col >= b_col_end or b_col >= a_col_end):
+			return true
+
+	return false
+
+# Check if combining two tanks would create a valid rectangle
+func _can_combine_to_rectangle(tank_a: Dictionary, tank_b: Dictionary) -> bool:
+	# First check if they share a side
+	if not _tanks_share_side(tank_a, tank_b):
+		return false
+
+	# Get the bounding box of both tanks combined
+	var min_row = min(tank_a.row, tank_b.row)
+	var min_col = min(tank_a.col, tank_b.col)
+	var max_row = max(tank_a.row + tank_a.height, tank_b.row + tank_b.height)
+	var max_col = max(tank_a.col + tank_a.width, tank_b.col + tank_b.width)
+
+	var combined_width = max_col - min_col
+	var combined_height = max_row - min_row
+	var combined_area = combined_width * combined_height
+
+	# The actual area covered by both tanks
+	var actual_area = (tank_a.width * tank_a.height) + (tank_b.width * tank_b.height)
+
+	# If the combined area equals the actual area, it's a perfect rectangle
+	return combined_area == actual_area
+
+# Update combine buttons for all adjacent tanks
+func _update_combine_buttons():
+	# Clean up existing buttons first
+	_cleanup_combine_buttons()
+
+	# Find all adjacent tanks that can be combined
+	for tank in all_tanks:
+		if tank == self or not is_instance_valid(tank):
+			continue
+
+		if not tank.has_method("get_grid_bounds"):
+			continue
+
+		var my_bounds = get_grid_bounds()
+		var other_bounds = tank.get_grid_bounds()
+
+		# Check if we can combine these tanks
+		if _can_combine_to_rectangle(my_bounds, other_bounds):
+			# Create a combine button between them (only if not already created)
+			if not combine_buttons.has(tank):
+				_create_combine_button(tank)
+
+# Create a combine button between this tank and another
+func _create_combine_button(other_tank: Node3D):
+	# Create a 2D button
+	var button = Button.new()
+	button.text = "+"
+	button.custom_minimum_size = Vector2(40, 40)
+
+	# Style the button
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = Color(1.0, 0.8, 0.0, 0.9)  # Gold/yellow
+	style_normal.border_color = Color(0.8, 0.6, 0.0, 1.0)
+	style_normal.set_border_width_all(2)
+	style_normal.corner_radius_top_left = 20
+	style_normal.corner_radius_top_right = 20
+	style_normal.corner_radius_bottom_left = 20
+	style_normal.corner_radius_bottom_right = 20
+	button.add_theme_stylebox_override("normal", style_normal)
+
+	var style_hover = StyleBoxFlat.new()
+	style_hover.bg_color = Color(1.0, 1.0, 0.0, 1.0)  # Brighter yellow
+	style_hover.border_color = Color(0.8, 0.6, 0.0, 1.0)
+	style_hover.set_border_width_all(2)
+	style_hover.corner_radius_top_left = 20
+	style_hover.corner_radius_top_right = 20
+	style_hover.corner_radius_bottom_left = 20
+	style_hover.corner_radius_bottom_right = 20
+	button.add_theme_stylebox_override("hover", style_hover)
+
+	var style_pressed = StyleBoxFlat.new()
+	style_pressed.bg_color = Color(0.8, 0.6, 0.0, 1.0)  # Darker when pressed
+	style_pressed.border_color = Color(0.6, 0.4, 0.0, 1.0)
+	style_pressed.set_border_width_all(2)
+	style_pressed.corner_radius_top_left = 20
+	style_pressed.corner_radius_top_right = 20
+	style_pressed.corner_radius_bottom_left = 20
+	style_pressed.corner_radius_bottom_right = 20
+	button.add_theme_stylebox_override("pressed", style_pressed)
+
+	# Style the text
+	button.add_theme_font_size_override("font_size", 24)
+	button.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0))
+
+	# Connect button press signal
+	button.pressed.connect(_combine_with_tank.bind(other_tank))
+
+	# Get or create the UI layer
+	var ui_layer = _get_or_create_ui_layer()
+	ui_layer.add_child(button)
+
+	# Store reference with the 3D position for positioning
+	var button_data = {
+		"button": button,
+		"other_tank": other_tank,
+		"world_position": Vector3.ZERO  # Will be updated in _update_combine_button_positions
+	}
+	combine_buttons[other_tank] = button_data
+
+	# Initial position update
+	_update_combine_button_positions()
+
+# Get or create a CanvasLayer for UI elements
+func _get_or_create_ui_layer() -> CanvasLayer:
+	# Try to find existing UI layer in the scene
+	var root = get_tree().root
+	for child in root.get_children():
+		if child.name == "CombineButtonLayer":
+			return child as CanvasLayer
+
+	# Create new CanvasLayer if it doesn't exist
+	var ui_layer = CanvasLayer.new()
+	ui_layer.name = "CombineButtonLayer"
+	ui_layer.layer = 100  # High layer to appear on top
+	root.add_child(ui_layer)
+	return ui_layer
+
+# Update positions of all combine buttons
+func _update_combine_button_positions():
+	var camera = get_viewport().get_camera_3d()
+	if not camera:
+		return
+
+	for tank in combine_buttons.keys():
+		if not is_instance_valid(tank):
+			continue
+
+		var button_data = combine_buttons[tank]
+		var button = button_data.button
+
+		if not is_instance_valid(button):
+			continue
+
+		# Calculate 3D world position (midpoint between tanks)
+		var mid_position = (global_position + tank.global_position) / 2.0
+		mid_position.y += tank_height / 2.0
+
+		# Convert 3D position to 2D screen position
+		var screen_pos = camera.unproject_position(mid_position)
+
+		# Check if position is behind camera
+		var cam_to_point = mid_position - camera.global_position
+		if cam_to_point.dot(-camera.global_transform.basis.z) < 0:
+			# Behind camera, hide button
+			button.visible = false
+			continue
+
+		# Position button (center it on the point)
+		button.position = screen_pos - button.size / 2.0
+		button.visible = true
+
+# Clean up all combine buttons
+func _cleanup_combine_buttons():
+	for button_data in combine_buttons.values():
+		if button_data is Dictionary and button_data.has("button"):
+			var button = button_data.button
+			if is_instance_valid(button):
+				button.queue_free()
+	combine_buttons.clear()
+
+# Combine this tank with another tank
+func _combine_with_tank(other_tank: Node3D):
+	if not is_instance_valid(other_tank):
+		return
+
+	if not other_tank.has_method("get_grid_bounds"):
+		return
+
+	var my_bounds = get_grid_bounds()
+	var other_bounds = other_tank.get_grid_bounds()
+
+	# Verify we can still combine (double-check)
+	if not _can_combine_to_rectangle(my_bounds, other_bounds):
+		return
+
+	print("Combining tanks!")
+
+	# Calculate new bounds
+	var new_row = min(my_bounds.row, other_bounds.row)
+	var new_col = min(my_bounds.col, other_bounds.col)
+	var new_width = max(my_bounds.col + my_bounds.width, other_bounds.col + other_bounds.width) - new_col
+	var new_height = max(my_bounds.row + my_bounds.height, other_bounds.row + other_bounds.height) - new_row
+
+	# Combine all fish from both tanks
+	var all_fish: Array[Node3D] = []
+	all_fish.append_array(contained_fish)
+	if other_tank.has_method("get") and "contained_fish" in other_tank:
+		all_fish.append_array(other_tank.contained_fish)
+
+	# Update this tank's dimensions
+	width = new_width
+	height = new_height
+	row = new_row
+	col = new_col
+
+	# Update max capacity based on new size
+	max_capacity = 100.0 * (width * height)
+
+	# Recreate visuals with new dimensions
+	_recreate_tank_visuals()
+
+	# Update position
+	update_position()
+
+	# Clear fish list and re-add all fish
+	contained_fish.clear()
+	current_capacity = 0.0
+
+	for fish in all_fish:
+		if fish and is_instance_valid(fish):
+			add_fish(fish)
+
+	# Delete the other tank
+	if is_instance_valid(other_tank):
+		other_tank.queue_free()
+
+	# Update combine buttons for all tanks
+	_update_all_tanks_combine_buttons()
+
+# Recreate tank visuals with new dimensions
+func _recreate_tank_visuals():
+	# Remove old visuals
+	if mesh_instance:
+		mesh_instance.queue_free()
+	if frame_mesh_instance:
+		frame_mesh_instance.queue_free()
+	if water_mesh_instance:
+		water_mesh_instance.queue_free()
+	if static_body:
+		static_body.queue_free()
+	if capacity_bar:
+		# Find and remove the viewport container
+		for child in get_children():
+			if child is SubViewport:
+				child.queue_free()
+
+	# Recreate everything
+	_create_tank_visual()
+	_setup_interaction()
+
+# Update combine buttons for all tanks in the scene
+func _update_all_tanks_combine_buttons():
+	for tank in all_tanks:
+		if is_instance_valid(tank) and tank.has_method("_update_combine_buttons"):
+			tank._update_combine_buttons()
