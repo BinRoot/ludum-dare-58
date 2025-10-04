@@ -23,7 +23,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 # User parameters
 # ===============
 @export var graph: Array[Vector2i] = [Vector2i(1, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4)]
-@export var move_speed := 2.0
+@export var move_speed := (randf() * 2) + 2
 @export var bounds_shape: CollisionShape3D
 
 @export var body_segments: int = 64
@@ -148,6 +148,9 @@ func _process(delta: float) -> void:
 			_make_eyes_look_at_target()
 
 func render_graph() -> void:
+	# Randomize fish color
+	base_color = Color(randf(), randf(), randf())
+
 	if _mesh_instance != null:
 		_mesh_instance.queue_free()
 	if _debug_mesh_instance != null:
