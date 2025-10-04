@@ -35,6 +35,12 @@ static var all_tanks: Array[Node3D] = []
 # Fish management
 var contained_fish: Array[Node3D] = []
 
+# Capacity system
+@export var max_capacity: float = 100.0  # Maximum capacity before tank breaks
+var current_capacity: float = 0.0  # Current capacity based on fish volumes
+var capacity_bar: ProgressBar = null  # UI progress bar for capacity
+var capacity_bar_container: Control = null  # Container for the progress bar
+
 func _ready():
 	# Allow fish tanks to be interactive even when the game is paused
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -252,6 +258,9 @@ func _create_water():
 	sell_preview_label.position = Vector3(0, tank_height + 0.6, 0)
 	add_child(sell_preview_label)
 
+	# Create capacity progress bar
+	_create_capacity_bar()
+
 func _setup_interaction():
 	# Create static body for mouse picking
 	static_body = StaticBody3D.new()
@@ -303,6 +312,10 @@ func _update_hover_effect():
 			material.albedo_color = glass_color * 1.3  # Brighten on hover
 		else:
 			material.albedo_color = glass_color
+
+	# Show/hide capacity bar based on hover state
+	if capacity_bar_container:
+		capacity_bar_container.visible = is_hovered and not is_dragging
 
 func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int):
 	if event is InputEventMouseButton:
@@ -539,12 +552,20 @@ func add_fish(fish: Node3D):
 	if not fish:
 		return
 
+	# Calculate fish volume and check capacity
+	var fish_volume = _calculate_fish_volume(fish)
+	var new_capacity = current_capacity + fish_volume
+
 	# Add to our list of contained fish
 	contained_fish.append(fish)
+	current_capacity = new_capacity
+	_update_capacity_bar()
 
-	# Mark fish as being in a tank
+	# Mark fish as being in a tank and store reference to this tank
 	if "is_in_tank" in fish:
 		fish.is_in_tank = true
+	if "parent_tank" in fish:
+		fish.parent_tank = self
 
 	# Create a collision shape for the tank bounds that the fish can use
 	var tank_bounds = _create_tank_bounds()
@@ -581,6 +602,10 @@ func add_fish(fish: Node3D):
 	# Pick a new destination so the fish starts swimming
 	if fish.has_method("_pick_new_destination"):
 		fish._pick_new_destination()
+
+	# Check if tank is over capacity
+	if current_capacity > max_capacity:
+		_break_tank()
 
 # Create a bounds collision shape for the fish to swim within
 func _create_tank_bounds() -> CollisionShape3D:
@@ -621,3 +646,262 @@ func _update_fish_positions(old_tank_position: Vector3):
 			# If fish is currently moving to a target, update the target too
 			if fish.has_method("get") and "current_target" in fish:
 				fish.current_target += position_delta
+
+# ===========================
+# Capacity System Methods
+# ===========================
+
+# Create the capacity progress bar UI
+func _create_capacity_bar():
+	# Create a SubViewport to render the UI in 3D space (doubled size for better readability)
+	var viewport = SubViewport.new()
+	viewport.size = Vector2i(600, 120)
+	viewport.transparent_bg = true
+	add_child(viewport)
+
+	# Create container control
+	capacity_bar_container = Control.new()
+	capacity_bar_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	viewport.add_child(capacity_bar_container)
+
+	# Create background panel (doubled size)
+	var panel = Panel.new()
+	panel.position = Vector2(20, 20)
+	panel.size = Vector2(560, 80)
+	capacity_bar_container.add_child(panel)
+
+	# Style the panel
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+	style_box.border_color = Color(0.3, 0.3, 0.3, 1.0)
+	style_box.set_border_width_all(3)
+	style_box.corner_radius_top_left = 8
+	style_box.corner_radius_top_right = 8
+	style_box.corner_radius_bottom_left = 8
+	style_box.corner_radius_bottom_right = 8
+	panel.add_theme_stylebox_override("panel", style_box)
+
+	# Create progress bar (doubled size)
+	capacity_bar = ProgressBar.new()
+	capacity_bar.position = Vector2(30, 30)
+	capacity_bar.size = Vector2(540, 60)
+	capacity_bar.min_value = 0
+	capacity_bar.max_value = 100
+	capacity_bar.value = 0
+	capacity_bar.show_percentage = false
+	capacity_bar_container.add_child(capacity_bar)
+
+	# Style the progress bar
+	var progress_bg = StyleBoxFlat.new()
+	progress_bg.bg_color = Color(0.2, 0.2, 0.2, 1.0)
+	progress_bg.corner_radius_top_left = 5
+	progress_bg.corner_radius_top_right = 5
+	progress_bg.corner_radius_bottom_left = 5
+	progress_bg.corner_radius_bottom_right = 5
+	capacity_bar.add_theme_stylebox_override("background", progress_bg)
+
+	var progress_fill = StyleBoxFlat.new()
+	progress_fill.bg_color = Color(0.3, 0.8, 0.3, 1.0)  # Green
+	progress_fill.corner_radius_top_left = 5
+	progress_fill.corner_radius_top_right = 5
+	progress_fill.corner_radius_bottom_left = 5
+	progress_fill.corner_radius_bottom_right = 5
+	capacity_bar.add_theme_stylebox_override("fill", progress_fill)
+
+	# Add label to show percentage text (larger font)
+	var label = Label.new()
+	label.position = Vector2(40, 40)
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 4)
+	capacity_bar_container.add_child(label)
+	capacity_bar.set_meta("label", label)
+
+	# Create a Sprite3D to display the viewport in 3D
+	var sprite = Sprite3D.new()
+	sprite.texture = viewport.get_texture()
+	sprite.pixel_size = 0.01  # Increased from 0.003 to make it much larger
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.no_depth_test = true
+	sprite.render_priority = 10
+	# Position above the tank
+	sprite.position = Vector3(0, tank_height + 0.5, -2.5)  # Raised higher too
+	add_child(sprite)
+
+	# Hide initially (show only on hover)
+	capacity_bar_container.visible = false
+
+# Calculate fish volume based on graph complexity
+func _calculate_fish_volume(fish: Node3D) -> float:
+	if not fish or not "graph" in fish:
+		return 10.0  # Default volume if fish has no graph
+
+	var graph = fish.graph
+	if graph.size() == 0:
+		return 10.0
+
+	# Count unique nodes in the graph
+	var nodes_set = {}
+	for edge in graph:
+		nodes_set[edge.x] = true
+		nodes_set[edge.y] = true
+
+	var num_nodes = nodes_set.size()
+	var num_edges = graph.size()
+
+	# Volume is based on graph complexity
+	# More nodes and edges = more complex = larger volume
+	var volume = (num_nodes * 5.0) + (num_edges * 3.0)
+
+	return volume
+
+# Update the capacity bar display
+func _update_capacity_bar():
+	if not capacity_bar:
+		return
+
+	var percentage = (current_capacity / max_capacity) * 100.0
+	capacity_bar.value = percentage
+
+	# Update label
+	var label = capacity_bar.get_meta("label") as Label
+	if label:
+		label.text = "Capacity: %d%%" % int(percentage)
+
+	# Change color based on capacity level
+	var progress_fill = capacity_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if progress_fill:
+		if percentage < 70:
+			progress_fill.bg_color = Color(0.3, 0.8, 0.3, 1.0)  # Green
+		elif percentage < 90:
+			progress_fill.bg_color = Color(0.9, 0.9, 0.3, 1.0)  # Yellow
+		else:
+			progress_fill.bg_color = Color(0.9, 0.3, 0.3, 1.0)  # Red
+
+# Recalculate total capacity from all contained fish
+func recalculate_capacity():
+	# Store old capacity for comparison
+	var old_capacity = current_capacity
+
+	# Reset capacity
+	current_capacity = 0.0
+
+	# Sum up volumes of all fish
+	for fish in contained_fish:
+		if fish and is_instance_valid(fish):
+			var fish_volume = _calculate_fish_volume(fish)
+			current_capacity += fish_volume
+			print("  Fish volume: ", fish_volume)
+
+	print("Tank capacity recalculated: ", old_capacity, " -> ", current_capacity, " (max: ", max_capacity, ")")
+
+	# Update display
+	_update_capacity_bar()
+
+	# Check if tank should break
+	if current_capacity > max_capacity:
+		print("Tank over capacity! Breaking...")
+		_break_tank()
+
+# Break the tank when over capacity
+func _break_tank():
+	print("Tank breaking! Over capacity: ", current_capacity, "/", max_capacity)
+
+	# Create breaking visual effect
+	_create_tank_break_effect()
+
+	# Kill all fish in the tank
+	for fish in contained_fish:
+		if fish and is_instance_valid(fish):
+			_kill_fish(fish)
+
+	# Clear the fish list
+	contained_fish.clear()
+	current_capacity = 0.0
+
+	# Destroy the tank after a delay (let fish animations play)
+	await get_tree().create_timer(3.0).timeout
+	queue_free()
+
+# Create visual effect for tank breaking
+func _create_tank_break_effect():
+	# Flash the tank red
+	if material:
+		var tween = create_tween()
+		tween.set_loops(3)
+		tween.tween_property(material, "albedo_color", Color(1.0, 0.2, 0.2, 0.5), 0.2)
+		tween.tween_property(material, "albedo_color", glass_color, 0.2)
+
+	# Create shatter particles (simple version with multiple small pieces)
+	for i in range(20):
+		var shard = MeshInstance3D.new()
+		var shard_mesh = BoxMesh.new()
+		shard_mesh.size = Vector3(0.1, 0.1, 0.1)
+		shard.mesh = shard_mesh
+
+		var shard_material = StandardMaterial3D.new()
+		shard_material.albedo_color = glass_color
+		shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		shard.set_surface_override_material(0, shard_material)
+
+		# Random position around tank
+		shard.position = position + Vector3(
+			randf_range(-width * cell_size / 2, width * cell_size / 2),
+			randf_range(0, tank_height),
+			randf_range(-height * cell_size / 2, height * cell_size / 2)
+		)
+
+		get_parent().add_child(shard)
+
+		# Animate shard falling and fading
+		var shard_tween = create_tween()
+		shard_tween.set_parallel(true)
+		shard_tween.tween_property(shard, "position:y", shard.position.y - 2.0, 1.0)
+		shard_tween.tween_property(shard_material, "albedo_color:a", 0.0, 1.0)
+		shard_tween.tween_property(shard, "rotation", Vector3(randf() * TAU, randf() * TAU, randf() * TAU), 1.0)
+		shard_tween.chain()
+		shard_tween.tween_callback(shard.queue_free)
+
+# Animate fish death - float to heaven and fade out
+func _kill_fish(fish: Node3D):
+	if not fish or not is_instance_valid(fish):
+		return
+
+	print("Fish dying: ", fish.name)
+
+	# Stop fish movement
+	if "is_moving" in fish:
+		fish.is_moving = false
+
+	# Get fish material for fading
+	var fish_material: ShaderMaterial = null
+	if fish.has_node("MeshInstance3D"):
+		var fish_mesh = fish.get_node("MeshInstance3D") as MeshInstance3D
+		if fish_mesh:
+			fish_material = fish_mesh.get_surface_override_material(0) as ShaderMaterial
+
+	# Create death animation
+	var death_tween = create_tween()
+	death_tween.set_parallel(true)
+
+	# Float upward (to heaven)
+	var float_distance = 10.0
+	death_tween.tween_property(fish, "global_position:y", fish.global_position.y + float_distance, 2.5).set_ease(Tween.EASE_OUT)
+
+	# Rotate while floating
+	death_tween.tween_property(fish, "rotation:y", fish.rotation.y + PI * 2, 2.5)
+
+	# Fade out by adjusting the base color alpha if we have shader material
+	if fish_material and fish_material.shader:
+		var original_color = fish_material.get_shader_parameter("base_color") as Color
+		if original_color:
+			var transparent_color = Color(original_color.r, original_color.g, original_color.b, 0.0)
+			death_tween.tween_property(fish_material, "shader_parameter/base_color", transparent_color, 2.5)
+
+	# Scale down while floating
+	death_tween.tween_property(fish, "scale", Vector3(0.1, 0.1, 0.1), 2.5).set_ease(Tween.EASE_IN)
+
+	# Delete fish after animation
+	death_tween.chain()
+	death_tween.tween_callback(fish.queue_free)

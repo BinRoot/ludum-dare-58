@@ -85,6 +85,7 @@ var arrival_distance: float = 0.5
 # Age and growth
 var age: int = -1
 var is_in_tank: bool = false
+var parent_tank: Node3D = null  # Reference to the tank this fish is in
 
 # Surface behavior state
 var is_surfacing: bool = false
@@ -1124,6 +1125,10 @@ func grow() -> void:
 	if is_moving:
 		_pick_new_destination()
 
+	# Notify parent tank to recalculate capacity
+	if is_in_tank:
+		_notify_tank_of_growth()
+
 # ======================
 # Surface Behavior
 # ======================
@@ -1165,3 +1170,14 @@ func _submerge() -> void:
 	var current_basis: Basis = global_transform.basis
 	var look_down_rotation: Basis = Basis(Vector3.FORWARD, deg_to_rad(surface_look_angle))
 	global_transform.basis = current_basis * look_down_rotation
+
+# Notify the parent tank that this fish has grown
+func _notify_tank_of_growth() -> void:
+	if parent_tank and is_instance_valid(parent_tank):
+		if parent_tank.has_method("recalculate_capacity"):
+			print("Fish grew! Notifying tank to recalculate capacity")
+			parent_tank.recalculate_capacity()
+		else:
+			print("Warning: Parent tank doesn't have recalculate_capacity method")
+	else:
+		print("Warning: Fish has no valid parent tank reference")
