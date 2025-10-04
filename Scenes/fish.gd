@@ -51,6 +51,12 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 
 @export var base_color: Color = Color(0.78, 0.9, 1.0)
 
+@export_group("Wiggle")
+@export var wiggle_amplitude: float = 0.15
+@export var wiggle_frequency: float = 2.0
+@export var wiggle_speed: float = 1.5
+@export var tail_amplification: float = 2.5
+
 @export_group("Debug")
 @export var debug_mode: bool = true
 @export var debug_spine_color: Color = Color(1.0, 0.0, 0.0)
@@ -64,9 +70,23 @@ const TAU: float = PI * 2.0
 
 var _mesh_instance: MeshInstance3D
 var _debug_mesh_instance: MeshInstance3D
+var _shader_material: ShaderMaterial
+
+# Store spine data for wiggle calculations
+var _spine_curve: PackedVector3Array
+var _spine_normals: PackedVector3Array
+var _spine_binormals: PackedVector3Array
+var _spine_tangents: PackedVector3Array
+var _spine_bias: PackedFloat32Array
+var _spine_segments: int
 
 func _ready() -> void:
 	render_graph()
+
+func _process(_delta: float) -> void:
+	# Update eye positions to match the wiggle animation
+	if _spine_curve.size() > 0 and left_fish_eye != null and right_fish_eye != null:
+		_update_wiggling_eyes()
 
 func render_graph() -> void:
 	if _mesh_instance != null:
@@ -164,6 +184,7 @@ func render_graph() -> void:
 	var verts: PackedVector3Array = PackedVector3Array()
 	var norms: PackedVector3Array = PackedVector3Array()
 	var uvs: PackedVector2Array = PackedVector2Array()
+	var colors: PackedColorArray = PackedColorArray()  # Store binormal direction for wiggle
 	var idx: PackedInt32Array = PackedInt32Array()
 
 	var ks: int = max(8, ring_sides)
@@ -196,6 +217,10 @@ func render_graph() -> void:
 
 			uvs.push_back(Vector2(float(i2) / float(ks), s_val))
 
+			# Store Brot (binormal after twist) as color for wiggle direction
+			# RGB stores the binormal vector, A stores body position
+			colors.push_back(Color(Brot.x, Brot.y, Brot.z, s_val))
+
 	# Side faces
 	for j8: int in range(ns - 1):
 		for i3: int in range(ks):
@@ -210,6 +235,10 @@ func render_graph() -> void:
 	verts.push_back(C[ns - 1])
 	norms.push_back(T[ns - 1])
 	uvs.push_back(Vector2(0.5, 1.0))
+	# Head binormal (at s=1.0)
+	var phi_head: float = twist * 1.0
+	var Brot_head: Vector3 = (-N[ns - 1] * sin(phi_head)) + (B[ns - 1] * cos(phi_head))
+	colors.push_back(Color(Brot_head.x, Brot_head.y, Brot_head.z, 1.0))
 	for i4: int in range(ks):
 		var a_idx: int = (ns - 1) * ks + i4
 		var b_idx: int = (ns - 1) * ks + ((i4 + 1) % ks)
@@ -219,6 +248,9 @@ func render_graph() -> void:
 	verts.push_back(C[0])
 	norms.push_back(-T[0])
 	uvs.push_back(Vector2(0.5, 0.0))
+	# Tail binormal (at s=0.0)
+	var Brot_tail: Vector3 = B[0]
+	colors.push_back(Color(Brot_tail.x, Brot_tail.y, Brot_tail.z, 0.0))
 	for i5: int in range(ks):
 		var a2_idx: int = ((i5 + 1) % ks)
 		var b2_idx: int = i5
@@ -254,7 +286,7 @@ func render_graph() -> void:
 				continue
 			var pa: Vector3 = node_anchor[au]
 			var pb: Vector3 = node_anchor[bv]
-			_append_cylinder(verts, norms, uvs, idx, pa, pb, tube_radius, tube_segments, ring_sides)
+			_append_cylinder(verts, norms, uvs, colors, idx, pa, pb, tube_radius, tube_segments, ring_sides)
 
 	# --- Build ArrayMesh
 	var arrays: Array = []
@@ -262,18 +294,36 @@ func render_graph() -> void:
 	arrays[Mesh.ARRAY_VERTEX]   = verts
 	arrays[Mesh.ARRAY_NORMAL]   = norms
 	arrays[Mesh.ARRAY_TEX_UV]   = uvs
+	arrays[Mesh.ARRAY_COLOR]    = colors
 	arrays[Mesh.ARRAY_INDEX]    = idx
 
 	var mesh: ArrayMesh = ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.albedo_color = base_color
-	mat.roughness = 0.65
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED  # Render both sides to plug holes
+	# Load and setup the wiggle shader
+	var shader: Shader = load("res://Scenes/fish_wiggle.gdshader")
+	_shader_material = ShaderMaterial.new()
+	_shader_material.shader = shader
+	_shader_material.set_shader_parameter("wiggle_amplitude", wiggle_amplitude)
+	_shader_material.set_shader_parameter("wiggle_frequency", wiggle_frequency)
+	_shader_material.set_shader_parameter("wiggle_speed", wiggle_speed)
+	_shader_material.set_shader_parameter("tail_amplification", tail_amplification)
+	_shader_material.set_shader_parameter("base_color", base_color)
+
+	# Set render mode
+	_shader_material.render_priority = 0
 
 	_mesh_instance.mesh = mesh
-	_mesh_instance.set_surface_override_material(0, mat)
+	_mesh_instance.set_surface_override_material(0, _shader_material)
+	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+	# Store spine data for wiggle calculations
+	_spine_curve = C
+	_spine_normals = N
+	_spine_binormals = B
+	_spine_tangents = T
+	_spine_bias = bias
+	_spine_segments = ns
 
 	# --- Position eyes
 	_position_eyes(C, N, B, T, bias, ns)
@@ -413,6 +463,83 @@ func _position_eyes(C: PackedVector3Array, N: PackedVector3Array, B: PackedVecto
 	# Orient eyes to look outward and forward
 	left_fish_eye.look_at(pos + eye_offset.normalized() + T[j_eye], Brot)
 	right_fish_eye.look_at(pos - eye_offset.normalized() + T[j_eye], Brot)
+
+# Calculate wiggle offset for a given position along the spine
+func _calculate_wiggle_offset(body_position: float, binormal: Vector3, up_direction: Vector3) -> Vector3:
+	var time: float = Time.get_ticks_msec() / 1000.0
+
+	# Calculate wiggle strength - stronger at the tail
+	var wiggle_strength: float = wiggle_amplitude * (1.0 - body_position) * tail_amplification
+
+	# Create traveling wave along the body
+	var wave: float = sin(body_position * wiggle_frequency - time * wiggle_speed)
+
+	# Apply wiggle along the binormal direction (side-to-side)
+	var lateral_offset: Vector3 = binormal * wave * wiggle_strength
+
+	# Vertical undulation along the up direction
+	var vertical_wave: float = sin(body_position * wiggle_frequency * 0.5 - time * wiggle_speed * 0.7)
+	var vertical_offset: Vector3 = up_direction * vertical_wave * wiggle_strength * 0.2
+
+	return lateral_offset + vertical_offset
+
+# Update eye positions to follow the wiggle animation
+func _update_wiggling_eyes() -> void:
+	if _spine_curve.size() == 0:
+		return
+
+	var ns: int = _spine_segments
+	var C: PackedVector3Array = _spine_curve
+	var N: PackedVector3Array = _spine_normals
+	var B: PackedVector3Array = _spine_binormals
+	var T: PackedVector3Array = _spine_tangents
+	var bias: PackedFloat32Array = _spine_bias
+
+	# Position eyes at ~90% along spine (near head)
+	var eye_s: float = 0.90
+	var j_eye: int = clamp(int(eye_s * float(ns - 1)), 0, ns - 1)
+
+	# Get spine position
+	var pos: Vector3 = C[j_eye]
+
+	# Calculate body dimensions at this point (same as mesh generation)
+	var s_val: float = float(j_eye) / float(ns - 1)
+	var gauss: float = bulge_amp * exp(-pow(s_val - bulge_center, 2.0) / max(1e-6, pow(bulge_sigma, 2.0)))
+	var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss)
+	var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss)
+	b_s *= (1.0 + asymmetry_amp * bias[j_eye])
+
+	# Apply twist rotation to get the correct binormal direction
+	var phi: float = deg_to_rad(twist_degrees) * s_val
+	var cph: float = cos(phi)
+	var sph: float = sin(phi)
+	var Nrot: Vector3 = (N[j_eye] * cph) + (B[j_eye] * sph)
+	var Brot: Vector3 = (-N[j_eye] * sph) + (B[j_eye] * cph)
+
+	# Calculate up direction (perpendicular to binormal and spine)
+	var up_direction: Vector3 = Brot.cross(T[j_eye]).normalized()
+
+	# Calculate wiggle offset using the proper binormal direction
+	var wiggle_offset: Vector3 = _calculate_wiggle_offset(eye_s, Brot, up_direction)
+
+	# Apply wiggle to base position
+	var wiggled_pos: Vector3 = pos + wiggle_offset
+
+	# Choose angle for eye placement
+	var eye_angle: float = PI * 0.25
+	var ct: float = cos(eye_angle)
+	var st: float = sin(eye_angle)
+
+	# Calculate eye offset
+	var eye_offset: Vector3 = (Nrot * (a_s * ct)) + (Brot * (b_s * st))
+
+	# Position eyes with wiggle applied
+	left_fish_eye.position = wiggled_pos + eye_offset
+	right_fish_eye.position = wiggled_pos - eye_offset
+
+	# Orient eyes to look outward and forward
+	left_fish_eye.look_at(wiggled_pos + eye_offset.normalized() + T[j_eye], Brot)
+	right_fish_eye.look_at(wiggled_pos - eye_offset.normalized() + T[j_eye], Brot)
 
 # =========================
 # Graph helpers / BFS / FR
@@ -640,7 +767,7 @@ func _quat_shortest_arc(from: Vector3, to: Vector3) -> Quaternion:
 	return Quaternion(axis2, angle)
 
 func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
-	uvs: PackedVector2Array, idx: PackedInt32Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array,
 	a: Vector3, b: Vector3, r: float, segs: int, sides: int) -> void:
 	var dir: Vector3 = (b - a).normalized()
 	var up: Vector3 = Vector3.RIGHT if abs(dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
@@ -657,6 +784,8 @@ func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
 			verts.push_back(pos + circle)
 			norms.push_back(circle.normalized())
 			uvs.push_back(Vector2(float(i) / float(sides), s))
+			# Tubes use e2 as binormal and position at 0.5 (moderate wiggle)
+			colors.push_back(Color(e2.x, e2.y, e2.z, 0.5))
 
 	for j2: int in range(segs):
 		for i2: int in range(sides):
@@ -671,6 +800,7 @@ func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
 	verts.push_back(a)
 	norms.push_back(-dir)
 	uvs.push_back(Vector2(0.5, 0.0))
+	colors.push_back(Color(e2.x, e2.y, e2.z, 0.5))
 	for i3: int in range(sides):
 		var ri: int = offset + i3
 		var rj: int = offset + ((i3 + 1) % sides)
@@ -680,6 +810,7 @@ func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
 	verts.push_back(b)
 	norms.push_back(dir)
 	uvs.push_back(Vector2(0.5, 1.0))
+	colors.push_back(Color(e2.x, e2.y, e2.z, 0.5))
 	var base: int = offset + segs * sides
 	for i4: int in range(sides):
 		var ri2: int = base + i4
