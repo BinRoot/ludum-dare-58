@@ -288,36 +288,22 @@ func render_graph() -> void:
 			var pb: Vector3 = node_anchor[bv]
 			_append_cylinder(verts, norms, uvs, colors, idx, pa, pb, tube_radius, tube_segments, ring_sides)
 
-	# --- Build ArrayMesh
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX]   = verts
-	arrays[Mesh.ARRAY_NORMAL]   = norms
-	arrays[Mesh.ARRAY_TEX_UV]   = uvs
-	arrays[Mesh.ARRAY_COLOR]    = colors
-	arrays[Mesh.ARRAY_INDEX]    = idx
+	# ==============================================
+	# STEP 1: Rotate fish so spine aligns to X-axis
+	# ==============================================
+	var rotation_transform: Transform3D = _calculate_spine_alignment_transform(C, T)
+	_apply_transform_to_geometry(verts, norms, colors, C, N, B, T, rotation_transform)
 
-	var mesh: ArrayMesh = ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	# ==============================================
+	# STEP 2: Build mesh with improved connectivity
+	# ==============================================
+	var mesh: ArrayMesh = _build_optimized_mesh(verts, norms, uvs, colors, idx)
 
-	# Load and setup the wiggle shader
-	var shader: Shader = load("res://Scenes/fish_wiggle.gdshader")
-	_shader_material = ShaderMaterial.new()
-	_shader_material.shader = shader
-	_shader_material.set_shader_parameter("wiggle_amplitude", wiggle_amplitude)
-	_shader_material.set_shader_parameter("wiggle_frequency", wiggle_frequency)
-	_shader_material.set_shader_parameter("wiggle_speed", wiggle_speed)
-	_shader_material.set_shader_parameter("tail_amplification", tail_amplification)
-	_shader_material.set_shader_parameter("base_color", base_color)
-
-	# Set render mode
-	_shader_material.render_priority = 0
-
+	# Attach mesh to instance
 	_mesh_instance.mesh = mesh
-	_mesh_instance.set_surface_override_material(0, _shader_material)
 	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
-	# Store spine data for wiggle calculations
+	# Store spine data for wiggle calculations (after rotation)
 	_spine_curve = C
 	_spine_normals = N
 	_spine_binormals = B
@@ -325,8 +311,15 @@ func render_graph() -> void:
 	_spine_bias = bias
 	_spine_segments = ns
 
-	# --- Position eyes
+	# ==============================================
+	# STEP 3: Position eyes on the rotated mesh
+	# ==============================================
 	_position_eyes(C, N, B, T, bias, ns)
+
+	# ==============================================
+	# STEP 4: Setup wiggle shader
+	# ==============================================
+	_setup_wiggle_shader()
 
 	# --- Debug visualization
 	if debug_mode:
@@ -463,6 +456,113 @@ func _position_eyes(C: PackedVector3Array, N: PackedVector3Array, B: PackedVecto
 	# Orient eyes to look outward and forward
 	left_fish_eye.look_at(pos + eye_offset.normalized() + T[j_eye], Brot)
 	right_fish_eye.look_at(pos - eye_offset.normalized() + T[j_eye], Brot)
+
+# ==============================================
+# Mesh transformation and optimization functions
+# ==============================================
+
+# Calculate transform to align spine to X-axis
+func _calculate_spine_alignment_transform(C: PackedVector3Array, _T: PackedVector3Array) -> Transform3D:
+	if C.size() < 2:
+		return Transform3D.IDENTITY
+
+	# Get the average direction of the spine (from tail to head)
+	var spine_direction: Vector3 = (C[C.size() - 1] - C[0]).normalized()
+
+	# Calculate rotation to align spine_direction to X-axis (Vector3.RIGHT)
+	var target_axis: Vector3 = Vector3.RIGHT
+
+	# If already aligned, return identity
+	if spine_direction.dot(target_axis) > 0.9999:
+		return Transform3D.IDENTITY
+
+	# Calculate rotation axis and angle
+	var rotation_axis: Vector3 = spine_direction.cross(target_axis)
+	if rotation_axis.length() < 0.0001:
+		# Spine is opposite to X-axis, rotate 180 degrees around any perpendicular axis
+		rotation_axis = Vector3.UP if abs(spine_direction.dot(Vector3.UP)) < 0.9 else Vector3.FORWARD
+	else:
+		rotation_axis = rotation_axis.normalized()
+
+	var angle: float = acos(clamp(spine_direction.dot(target_axis), -1.0, 1.0))
+
+	# Create rotation basis
+	var rotation_basis: Basis = Basis(rotation_axis, angle)
+
+	# Calculate centroid for rotation pivot
+	var centroid: Vector3 = Vector3.ZERO
+	for point in C:
+		centroid += point
+	centroid /= float(C.size())
+
+	# Create transform: move to origin, rotate, move back
+	var final_transform: Transform3D = Transform3D.IDENTITY
+	final_transform.origin = centroid
+	var rotate_transform: Transform3D = Transform3D(rotation_basis, Vector3.ZERO)
+	var move_to_origin: Transform3D = Transform3D.IDENTITY
+	move_to_origin.origin = -centroid
+
+	return final_transform * rotate_transform * move_to_origin
+
+# Apply transform to all geometry
+func _apply_transform_to_geometry(verts: PackedVector3Array, norms: PackedVector3Array,
+	colors: PackedColorArray, C: PackedVector3Array, N: PackedVector3Array,
+	B: PackedVector3Array, T: PackedVector3Array, xform: Transform3D) -> void:
+
+	# Transform vertices
+	for i in range(verts.size()):
+		verts[i] = xform * verts[i]
+
+	# Transform normals (only rotation, no translation)
+	for i in range(norms.size()):
+		norms[i] = xform.basis * norms[i]
+
+	# Transform color data (binormal directions)
+	for i in range(colors.size()):
+		var binormal: Vector3 = Vector3(colors[i].r, colors[i].g, colors[i].b)
+		binormal = xform.basis * binormal
+		colors[i] = Color(binormal.x, binormal.y, binormal.z, colors[i].a)
+
+	# Transform spine data
+	for i in range(C.size()):
+		C[i] = xform * C[i]
+		N[i] = xform.basis * N[i]
+		B[i] = xform.basis * B[i]
+		T[i] = xform.basis * T[i]
+
+# Build mesh with optimized connectivity to reduce gaps
+func _build_optimized_mesh(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array) -> ArrayMesh:
+
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]   = verts
+	arrays[Mesh.ARRAY_NORMAL]   = norms
+	arrays[Mesh.ARRAY_TEX_UV]   = uvs
+	arrays[Mesh.ARRAY_COLOR]    = colors
+	arrays[Mesh.ARRAY_INDEX]    = idx
+
+	var mesh: ArrayMesh = ArrayMesh.new()
+	# Use PRIMITIVE_TRIANGLES with proper winding for solid, gap-free mesh
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+	return mesh
+
+# Setup the wiggle shader with all parameters
+func _setup_wiggle_shader() -> void:
+	var shader: Shader = load("res://Scenes/fish_wiggle.gdshader")
+	_shader_material = ShaderMaterial.new()
+	_shader_material.shader = shader
+	_shader_material.set_shader_parameter("wiggle_amplitude", wiggle_amplitude)
+	_shader_material.set_shader_parameter("wiggle_frequency", wiggle_frequency)
+	_shader_material.set_shader_parameter("wiggle_speed", wiggle_speed)
+	_shader_material.set_shader_parameter("tail_amplification", tail_amplification)
+	_shader_material.set_shader_parameter("base_color", base_color)
+	_shader_material.render_priority = 0
+
+	# Apply shader to mesh
+	if _mesh_instance and _mesh_instance.mesh:
+		_mesh_instance.set_surface_override_material(0, _shader_material)
 
 # Calculate wiggle offset for a given position along the spine
 func _calculate_wiggle_offset(body_position: float, binormal: Vector3, up_direction: Vector3) -> Vector3:
