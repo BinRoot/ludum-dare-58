@@ -82,6 +82,15 @@ var current_target: Vector3 = Vector3.ZERO
 var is_moving: bool = false
 var arrival_distance: float = 0.5
 
+# Surface behavior state
+var is_surfacing: bool = false
+var surface_timer: float = 0.0
+var next_surface_time: float = 0.0
+@export var surface_interval_min: float = 1.0  # Minimum time between surfaces
+@export var surface_interval_max: float = 5.0  # Maximum time between surfaces
+@export var surface_duration: float = 0.5  # How long the fish stays visible at surface
+@export var surface_look_angle: float = 25.0  # Degrees to look up when surfacing
+
 var _mesh_instance: MeshInstance3D
 var _debug_mesh_instance: MeshInstance3D
 var _shader_material: ShaderMaterial
@@ -98,6 +107,10 @@ func _ready() -> void:
 	render_graph()
 	# Start moving once the fish is ready
 	_pick_new_destination()
+	# Schedule first surface appearance
+	next_surface_time = randf_range(surface_interval_min, surface_interval_max)
+	# Start hidden (underwater)
+	visible = false
 
 # Calculate scale factor based on graph complexity
 func _calculate_complexity_scale() -> float:
@@ -119,8 +132,11 @@ func _calculate_complexity_scale() -> float:
 	return clamp(scale_factor, min_scale, max_scale)
 
 func _process(delta: float) -> void:
+	# Handle surface behavior
+	_handle_surface_behavior(delta)
+
 	# Handle movement
-	if is_moving:
+	if is_moving and not is_surfacing:
 		_move_toward_target(delta)
 
 	# Update eye positions to match the wiggle animation
@@ -128,7 +144,7 @@ func _process(delta: float) -> void:
 		_update_wiggling_eyes()
 
 		# Make eyes look at the destination while moving
-		if is_moving:
+		if is_moving and not is_surfacing:
 			_make_eyes_look_at_target()
 
 func render_graph() -> void:
@@ -1090,3 +1106,45 @@ func _make_eyes_look_at_target() -> void:
 func _on_button_pressed() -> void:
 	graph = mutate_graph.mutate(graph)[0]
 	render_graph()
+
+# ======================
+# Surface Behavior
+# ======================
+
+# Handle the fish surfacing behavior
+func _handle_surface_behavior(delta: float) -> void:
+	surface_timer += delta
+
+	if is_surfacing:
+		# Fish is currently at the surface
+		if surface_timer >= surface_duration:
+			_submerge()
+	else:
+		# Fish is underwater, check if it's time to surface
+		if surface_timer >= next_surface_time:
+			_surface()
+
+# Make the fish surface (become visible and look up)
+func _surface() -> void:
+	is_surfacing = true
+	visible = true
+	surface_timer = 0.0
+
+	# Apply upward rotation to look up slightly
+	var current_basis: Basis = global_transform.basis
+	var look_up_rotation: Basis = Basis(Vector3.FORWARD, deg_to_rad(-surface_look_angle))
+	global_transform.basis = current_basis * look_up_rotation
+
+# Make the fish submerge (become hidden and return to normal orientation)
+func _submerge() -> void:
+	is_surfacing = false
+	visible = false
+	surface_timer = 0.0
+
+	# Schedule next surface time
+	next_surface_time = randf_range(surface_interval_min, surface_interval_max)
+
+	# Return to normal orientation (remove the upward tilt)
+	var current_basis: Basis = global_transform.basis
+	var look_down_rotation: Basis = Basis(Vector3.FORWARD, deg_to_rad(surface_look_angle))
+	global_transform.basis = current_basis * look_down_rotation
