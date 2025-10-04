@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8fkmq42i7p3q"]
+
+[ext_resource type="Script" path="res://Scenes/grid_visualizer.gd" id="1_gridviz"]
+
+[node name="GridVisualizer" type="Node3D"]
+script = ExtResource("1_gridviz")

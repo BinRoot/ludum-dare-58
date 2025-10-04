@@ -64,9 +64,38 @@ func _find_fish_recursive(node: Node, fish_list: Array[Node3D]):
 
 func _on_fish_caught(fish: Node3D, tile: Node3D):
 	print("Fish caught at tile: ", tile.position)
-	# Remove the fish from the scene
-	if fish:
-		fish.queue_free()
 	# Consume the net from the tile (it was used to catch the fish)
 	if tile:
 		tile.consume_net()
+
+	# Show the fish close to camera and ask user to select a tank
+	if fish:
+		_show_fish_for_tank_selection(fish)
+
+func _show_fish_for_tank_selection(fish: Node3D):
+	# Store the caught fish globally
+	Global.caught_fish = fish
+	Global.is_selecting_tank = true
+	Global.fish_tank_selection_started.emit()
+
+	# Pause the game world
+	get_tree().paused = true
+
+	# Make the fish visible and move it close to the camera
+	fish.visible = true
+
+	# Get the camera
+	var camera = get_viewport().get_camera_3d()
+	if camera:
+		# Position fish in front of camera (closer view)
+		var camera_forward = -camera.global_transform.basis.z
+		var fish_position = camera.global_position + camera_forward * 5.0
+		fish.global_position = fish_position
+
+		# Make it face the camera
+		fish.look_at(camera.global_position, Vector3.UP)
+
+		# Stop the fish from moving around
+		if fish.has_method("set_movement_enabled"):
+			fish.set_movement_enabled(false)
+		fish.is_moving = false

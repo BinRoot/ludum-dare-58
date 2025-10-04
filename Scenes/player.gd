@@ -8,18 +8,6 @@ extends Node3D
 var target := Vector3.ZERO
 var has_target := false
 
-func _unhandled_input(e):
-	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
-		if camera == null:
-			push_error("Assign a Camera3D to the script.")
-			return
-		var from := camera.project_ray_origin(e.position)
-		var dir  := camera.project_ray_normal(e.position)
-		var hit = Plane(Vector3.UP, ground_y).intersects_ray(from, dir)
-		if hit != null:
-			target = hit
-			has_target = true
-
 func _process(delta):
 	if has_target:
 		var pos := global_position

@@ -1,11 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://clshdani8u3d0"]
+[gd_scene load_steps=2 format=3 uid="uid://clshdani8u3d0"]
 
 [ext_resource type="Script" uid="uid://bqkvuen1u8eh2" path="res://Scenes/fish_tank.gd" id="1_xvk27"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_nacvw"]
-
 [node name="FishTank" type="Node3D"]
 script = ExtResource("1_xvk27")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_nacvw")

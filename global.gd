@@ -12,6 +12,12 @@ var inventory: Dictionary = {}
 # Signal to notify when inventory changes
 signal inventory_changed
 
+# Fish tank selection state
+var caught_fish: Node3D = null
+var is_selecting_tank: bool = false
+signal fish_tank_selection_started
+signal fish_placed_in_tank
+
 func _ready():
 	# Create the net item
 	net_item = ItemData.new()
