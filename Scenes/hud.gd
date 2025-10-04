@@ -29,7 +29,7 @@ func _ready():
 
 func _create_tank_selection_label():
 	tank_selection_label = Label.new()
-	tank_selection_label.text = "Click on a fish tank to place the fish!"
+	tank_selection_label.text = "Give your fish a home!"
 	tank_selection_label.add_theme_font_size_override("font_size", 24)
 	tank_selection_label.add_theme_color_override("font_color", Color.YELLOW)
 	tank_selection_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -50,10 +50,16 @@ func _create_tank_selection_label():
 func _on_tank_selection_started():
 	if tank_selection_label:
 		tank_selection_label.visible = true
+	# Hide the inventory container during tank selection
+	if inventory_container:
+		inventory_container.visible = false
 
 func _on_fish_placed():
 	if tank_selection_label:
 		tank_selection_label.visible = false
+	# Show the inventory container again after placing the fish
+	if inventory_container:
+		inventory_container.visible = true
 
 func _create_clams_label():
 	clams_label = Label.new()

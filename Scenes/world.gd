@@ -16,6 +16,7 @@ var sea_tiles: Array[Node3D] = []
 # Camera animation
 var original_camera_transform: Transform3D
 var camera_tween: Tween = null
+var fish_rotation_tween: Tween = null
 
 func _ready():
 	# Allow the world to process even when paused (for camera animations)
@@ -92,9 +93,6 @@ func _on_fish_caught(fish: Node3D, tile: Node3D):
 	# Remove all nets from all tiles and return 3 nets to inventory
 	_remove_all_nets_and_return_to_inventory()
 
-	# Reward the player with clams for catching a fish
-	Global.add_clams(10)
-	print("Earned 10 clams! Total: ", Global.get_clams())
 
 	# Show the fish close to camera and ask user to select a tank
 	if fish:
@@ -146,6 +144,10 @@ func _show_fish_for_tank_selection(fish: Node3D):
 # Called when a fish is placed in a tank - spawn a new one
 func _on_fish_placed_in_tank():
 	print("Spawning new fish in ocean...")
+
+	# Stop the fish rotation tween if it's still running
+	if fish_rotation_tween and fish_rotation_tween.is_running():
+		fish_rotation_tween.kill()
 
 	# Clear the global caught fish list (fish has been processed)
 	Global.globally_caught_fish.clear()
@@ -215,7 +217,7 @@ func _animate_camera_to_tank_area(fish: Node3D):
 	var tank_center = tank_area.global_position
 
 	# Calculate a nice viewing position above and to the side of the tank area
-	var camera_offset = Vector3(0, 12, 8)  # Above and behind
+	var camera_offset = Vector3(0, 12, 5)  # Above and behind
 	var target_camera_position = tank_center + camera_offset
 
 	# Calculate the target rotation (basis) for looking at tank center
@@ -252,8 +254,51 @@ func _animate_camera_to_tank_area(fish: Node3D):
 
 			fish.global_position = fish_position
 			fish.visible = true
-			fish.look_at(camera.global_position, Vector3.UP)
+
+			# Make the fish face the camera directly
+			# Since the fish mesh is oriented along X-axis after rotation (from fish.gd line 360),
+			# we need to point the X-axis toward the camera
+			var direction_to_camera = (camera.global_position - fish.global_position).normalized()
+
+			# Calculate the basis for the fish to face the camera
+			# X-axis (fish forward) points toward camera
+			var fish_forward = direction_to_camera
+			# Keep the fish upright (Y should roughly align with world up)
+			var fish_right = fish_forward.cross(Vector3.UP).normalized()
+			# Recalculate up to ensure orthogonality
+			var fish_up = fish_right.cross(fish_forward).normalized()
+
+			# Create the basis and apply to the fish
+			fish.global_transform.basis = Basis(fish_forward, fish_up, fish_right)
+
+			# Animate the fish rotating 360 degrees to showcase it
+			_rotate_fish_360(fish)
 	)
+
+# Rotate the fish 360 degrees to showcase it
+func _rotate_fish_360(fish: Node3D):
+	if not fish:
+		return
+
+	# Stop any existing rotation tween
+	if fish_rotation_tween and fish_rotation_tween.is_running():
+		fish_rotation_tween.kill()
+
+	# Create a tween to rotate the fish
+	fish_rotation_tween = create_tween()
+	fish_rotation_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	fish_rotation_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
+	fish_rotation_tween.set_ease(Tween.EASE_IN_OUT)
+	fish_rotation_tween.set_trans(Tween.TRANS_SINE)
+
+	# Store the initial rotation
+	var initial_rotation = fish.rotation
+
+	# Rotate 360 degrees around the Y-axis (vertical)
+	fish_rotation_tween.tween_property(fish, "rotation:y", initial_rotation.y + TAU, 2.0)
+
+	# Loop the rotation continuously until the fish is placed in a tank
+	fish_rotation_tween.set_loops()
 
 # Animate camera back to original position
 func _animate_camera_to_original():

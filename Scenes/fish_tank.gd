@@ -27,6 +27,7 @@ var static_body: StaticBody3D
 var material: StandardMaterial3D
 var frame_mesh_instance: MeshInstance3D
 var water_mesh_instance: MeshInstance3D
+var sell_preview_label: Label3D = null
 
 # Static array to track all tanks (for collision detection)
 static var all_tanks: Array[Node3D] = []
@@ -235,6 +236,22 @@ func _create_water():
 
 	add_child(water_mesh_instance)
 
+	# Create sell preview label (hidden by default)
+	sell_preview_label = Label3D.new()
+	sell_preview_label.text = ""
+	sell_preview_label.font_size = 28
+	sell_preview_label.modulate = Color(1.0, 1.0, 0.6)
+	sell_preview_label.outline_modulate = Color.BLACK
+	sell_preview_label.outline_size = 4
+	sell_preview_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sell_preview_label.visible = false
+	sell_preview_label.pixel_size = 0.03
+	sell_preview_label.no_depth_test = true
+	sell_preview_label.render_priority = 10
+	# Position above tank center
+	sell_preview_label.position = Vector3(0, tank_height + 0.6, 0)
+	add_child(sell_preview_label)
+
 func _setup_interaction():
 	# Create static body for mouse picking
 	static_body = StaticBody3D.new()
@@ -352,6 +369,10 @@ func _end_drag():
 
 		_update_hover_effect()
 
+		# If dropped over sell tile, execute sale
+		if _is_over_sell_tile():
+			_sell_this_tank()
+
 func _process(_delta):
 	if is_dragging:
 		var old_position = position
@@ -370,12 +391,20 @@ func _input(event: InputEvent):
 
 func _update_drag_visual_feedback():
 	# Check if current position would cause a collision
-	if _check_collision():
-		# Show red tint when overlapping
+	var overlapping := _check_collision()
+	if overlapping:
 		material.albedo_color = Color(1.0, 0.3, 0.3, 0.4)
+		_hide_sell_preview()
+		return
+
+	# Show green tint when valid placement
+	material.albedo_color = Color(0.3, 1.0, 0.3, 0.4)
+
+	# If hovering over sell tile, show price preview
+	if _is_over_sell_tile():
+		_show_sell_preview()
 	else:
-		# Show green tint when valid placement
-		material.albedo_color = Color(0.3, 1.0, 0.3, 0.4)
+		_hide_sell_preview()
 
 func _update_drag_position():
 	var camera = get_viewport().get_camera_3d()
@@ -410,12 +439,47 @@ func _snap_to_grid():
 
 	# Update position to snapped coordinates
 	update_position()
+	# Hide preview when snapping/ending drag
+	_hide_sell_preview()
 
 func _update_grid_from_position():
 	# Convert world position back to grid coordinates (for preview during drag)
 	var local_pos = position - boundary_origin
 	col = int((local_pos.x - (width * cell_size / 2.0)) / cell_size)
 	row = int((local_pos.z - (height * cell_size / 2.0)) / cell_size)
+
+func _is_over_sell_tile() -> bool:
+	# Determine if current bounds overlap the configured sell tile cell
+	var sell_row: int = Global.sell_tile_row
+	var sell_col: int = Global.sell_tile_col
+	var bounds: Dictionary = get_grid_bounds()
+	return sell_row >= bounds.row and sell_row < bounds.row + bounds.height and sell_col >= bounds.col and sell_col < bounds.col + bounds.width
+
+func _show_sell_preview():
+	if sell_preview_label == null:
+		return
+	var price := Global.compute_tank_sell_value(contained_fish)
+	sell_preview_label.text = "+" + str(price) + " clams"
+	sell_preview_label.modulate = Color(0.9, 1.0, 0.6)
+	sell_preview_label.visible = true
+
+func _hide_sell_preview():
+	if sell_preview_label:
+		sell_preview_label.visible = false
+
+func _sell_this_tank():
+	# Calculate value and award clams
+	var value := Global.compute_tank_sell_value(contained_fish)
+	Global.add_clams(value)
+
+	# Free all contained fish
+	for fish in contained_fish:
+		if fish and is_instance_valid(fish):
+			fish.queue_free()
+	contained_fish.clear()
+
+	# Remove this tank from scene
+	queue_free()
 
 func _check_collision() -> bool:
 	# Check if this tank overlaps with any other tank
@@ -494,6 +558,11 @@ func add_fish(fish: Node3D):
 	var water_fill_percent = 0.9
 	var water_height = tank_height * water_fill_percent
 	fish.global_position = global_position + Vector3(0, water_height * 0.5, 0)
+
+	# Reset fish rotation to default orientation (identity rotation)
+	# This clears any rotation applied during the showcase (360-degree rotation)
+	fish.rotation = Vector3.ZERO
+	fish.global_transform.basis = Basis.IDENTITY
 
 	# Make fish visible and enable movement
 	fish.visible = true

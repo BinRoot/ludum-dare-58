@@ -17,6 +17,10 @@ var hovered_cell: Vector2i = Vector2i(-1, -1)
 var cost_label: Label3D = null
 var is_mouse_over_grid: bool = false
 
+# Sell tile visuals
+var sell_marker: MeshInstance3D = null
+var sell_label: Label3D = null
+
 # Signals
 signal cell_clicked(row: int, col: int)
 
@@ -27,6 +31,11 @@ func _ready():
 	_create_grid_visual()
 	_setup_interaction()
 	_create_cost_label()
+	_create_sell_marker()
+
+	# Connect to tank selection signals to hide/show sell label
+	Global.fish_tank_selection_started.connect(_on_tank_selection_started)
+	Global.fish_placed_in_tank.connect(_on_fish_placed)
 
 func _position_at_boundary():
 	# Position the grid at the boundary's location
@@ -177,6 +186,50 @@ func _create_cost_label():
 	add_child(cost_label)
 	print("Cost label created at grid position: ", global_position)
 
+func _create_sell_marker():
+	# Visual indicator for the sell tile cell
+	var col: int = Global.sell_tile_col
+	var row: int = Global.sell_tile_row
+
+	# Safety: clamp within grid
+	col = clamp(col, 0, grid_size - 1)
+	row = clamp(row, 0, grid_size - 1)
+
+	# Create a flat plane marker
+	sell_marker = MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(cell_size * 0.9, cell_size * 0.9)
+	sell_marker.mesh = plane
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.84, 0.0, 0.45) # golden, semi-transparent
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	sell_marker.set_surface_override_material(0, mat)
+
+	# Position at the center of the sell tile cell (local space; grid is at boundary origin)
+	sell_marker.position = Vector3(
+		col * cell_size + cell_size / 2.0,
+		0.02,
+		row * cell_size + cell_size / 2.0
+	)
+	add_child(sell_marker)
+
+	# Floating label above the marker
+	sell_label = Label3D.new()
+	sell_label.text = "Sell"
+	sell_label.font_size = 24
+	sell_label.modulate = Color(1.0, 0.95, 0.5)
+	sell_label.outline_modulate = Color.BLACK
+	sell_label.outline_size = 4
+	sell_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sell_label.pixel_size = 0.03
+	sell_label.no_depth_test = true
+	sell_label.render_priority = 10
+	sell_label.position = sell_marker.position + Vector3(0, 1.2, 0)
+	add_child(sell_label)
+
 func _on_mouse_entered():
 	is_mouse_over_grid = true
 
@@ -231,6 +284,11 @@ func _on_input_event(_camera: Node, event: InputEvent, event_position: Vector3, 
 func _try_buy_tank(row: int, col: int):
 	print("=== _try_buy_tank called for row:", row, " col:", col, " ===")
 
+	# Don't allow buying on the sell tile
+	if row == Global.sell_tile_row and col == Global.sell_tile_col:
+		print("Cannot buy tank on sell tile!")
+		return
+
 	# Check if cell is already occupied
 	var is_occupied = _is_cell_occupied(row, col)
 	print("Cell occupied check:", is_occupied)
@@ -269,9 +327,26 @@ func _is_cell_occupied(row: int, col: int) -> bool:
 						return true
 	return false
 
+func _is_any_tank_dragging() -> bool:
+	# Check if any tank is currently being dragged
+	var fish_tank_script = load("res://Scenes/fish_tank.gd")
+	if fish_tank_script and "all_tanks" in fish_tank_script:
+		var all_tanks = fish_tank_script.all_tanks
+		for tank in all_tanks:
+			if tank and is_instance_valid(tank) and "is_dragging" in tank:
+				if tank.is_dragging:
+					return true
+	return false
+
 func _process(_delta):
 	# Don't show cost label during tank selection mode
 	if Global.is_selecting_tank:
+		if cost_label:
+			cost_label.visible = false
+		return
+
+	# Don't show cost label when a tank is being dragged
+	if _is_any_tank_dragging():
 		if cost_label:
 			cost_label.visible = false
 		return
@@ -310,8 +385,10 @@ func _process(_delta):
 				)
 				cost_label.global_position = global_position + cell_center
 
-				# Only show if cell is not occupied
-				if not _is_cell_occupied(row, col):
+				# Don't show cost label on sell tile or occupied cells
+				if row == Global.sell_tile_row and col == Global.sell_tile_col:
+					cost_label.visible = false
+				elif not _is_cell_occupied(row, col):
 					cost_label.text = "Cost: " + str(tank_cost) + " clams"
 					if Global.get_clams() >= tank_cost:
 						cost_label.modulate = Color.GREEN
@@ -343,3 +420,23 @@ func _unhandled_input(event: InputEvent):
 				var col = hovered_cell.x
 				if not _is_cell_occupied(row, col):
 					_try_buy_tank(row, col)
+
+func _on_tank_selection_started():
+	# Hide the sell label and grid lines during tank selection
+	if sell_label:
+		sell_label.visible = false
+	if sell_marker:
+		sell_marker.visible = false
+	if mesh_instance:
+		mesh_instance.visible = false
+	if cost_label:
+		cost_label.visible = false
+
+func _on_fish_placed():
+	# Show the sell label and grid lines again after placing the fish
+	if sell_label:
+		sell_label.visible = true
+	if sell_marker:
+		sell_marker.visible = true
+	if mesh_instance:
+		mesh_instance.visible = true

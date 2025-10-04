@@ -220,7 +220,7 @@ func _create_net_visual():
 		net_visual.set_surface_override_material(0, net_material)
 
 		# Position it just above the water surface - NO rotation needed for horizontal
-		net_visual.position = Vector3(0, 0.55, 0)
+		net_visual.position = Vector3(0, 0.85, 0)
 		# Cylinder is already oriented vertically, so it naturally lies flat on XZ plane
 		add_child(net_visual)
 
@@ -235,16 +235,16 @@ func _create_casting_visual():
 
 		# Create an expanding ring effect for casting
 		var ring_mesh = TorusMesh.new()
-		ring_mesh.inner_radius = hex_radius * 0.3
+		ring_mesh.inner_radius = hex_radius * 0.4
 		ring_mesh.outer_radius = hex_radius * 0.5
-		ring_mesh.rings = 6
-		ring_mesh.ring_segments = 6
+		ring_mesh.rings = 8
+		ring_mesh.ring_segments = 3
 		casting_visual.mesh = ring_mesh
 
 		# Create a glowing animated material
 		var cast_material = StandardMaterial3D.new()
 		cast_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		cast_material.albedo_color = Color(1, 1, 1, 0.8)
+		cast_material.albedo_color = Color(1, 1, 1, 0.2)
 		cast_material.emission_enabled = true
 		cast_material.emission = Color(0.4, 0.8, 1.0)
 		cast_material.emission_energy_multiplier = 2.0
@@ -253,7 +253,7 @@ func _create_casting_visual():
 
 		# Position it just above the water surface
 		casting_visual.position = Vector3(0, 0.6, 0)
-		casting_visual.rotation.x = -PI / 2  # Rotate to lie flat
+		# Torus already lies flat by default, no rotation needed
 		add_child(casting_visual)
 
 		# Animate the casting visual - pulsing and expanding
@@ -263,10 +263,10 @@ func _create_casting_visual():
 
 		# Pulsing scale animation
 		cast_anim_tween.tween_property(casting_visual, "scale", Vector3(1.3, 1.3, 1.3), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-		cast_anim_tween.tween_property(casting_visual, "scale", Vector3(0.7, 0.7, 0.7), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE).set_delay(0.5)
+		cast_anim_tween.tween_property(casting_visual, "scale", Vector3(2, 2, 2), 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE).set_delay(0.5)
 
-		# Rotating animation
-		cast_anim_tween.tween_property(casting_visual, "rotation:z", TAU, 1.0)
+		# Rotating animation - spin like a wheel around Y axis
+		cast_anim_tween.tween_property(casting_visual, "rotation:y", TAU, 1.0)
 
 func _remove_casting_visual():
 	if casting_visual != null:

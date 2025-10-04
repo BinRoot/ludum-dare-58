@@ -10,7 +10,7 @@ uniform float fish_under : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 shadow_color : source_color = vec4(0.01, 0.02, 0.08, 1.0);
 uniform float shadow_intensity : hint_range(0.0, 1.0) = 0.95;
 uniform float hover_highlight : hint_range(0.0, 1.0) = 0.0;
-uniform vec4 highlight_color : source_color = vec4(0.03, 0.07, 0.01, 0.5);
+uniform vec4 highlight_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float border_width : hint_range(0.0, 1.0) = 0.15;
 
 varying vec3 local_pos;
@@ -36,34 +36,29 @@ void vertex() {
 
 // Calculate distance to nearest hexagon edge
 float hex_edge_distance(vec2 pos, float radius) {
-	// Calculate angle from center
-	float angle = atan(pos.y, pos.x);
+	// A regular hexagon (flat-top orientation) can be defined by 3 pairs of parallel edges
+	// We calculate distance to each of the 3 edge pairs and take the minimum
 
-	// Normalize angle to 0-2π
-	angle = angle < 0.0 ? angle + 6.283185 : angle;
+	// For a hexagon with circumradius 'radius', the apothem (perpendicular distance to edge) is:
+	float apothem = radius * 0.866025; // cos(30°)
 
-	// Find which hexagon segment (0-5) we're in
-	float segment = floor(angle / 1.047198); // 2π/6 ≈ 1.047198
+	// Define the 3 edge directions (normal vectors pointing inward)
+	// For flat-top hexagon: horizontal edges and two diagonal edges at ±30° from vertical
+	vec2 dir1 = vec2(0.0, 1.0);           // Horizontal edges (top/bottom)
+	vec2 dir2 = vec2(0.866025, 0.5);      // Diagonal edges (right side)
+	vec2 dir3 = vec2(-0.866025, 0.5);     // Diagonal edges (left side)
 
-	// Angle to nearest edge (each edge is at segment * 60°)
-	float edge_angle = segment * 1.047198 + 0.523599; // +30° to get to flat edge
+	// Calculate perpendicular distance to each pair of edges
+	float dist1 = apothem - abs(dot(pos, dir1));
+	float dist2 = apothem - abs(dot(pos, dir2));
+	float dist3 = apothem - abs(dot(pos, dir3));
 
-	// Distance from center
-	float dist = length(pos);
+	// The minimum distance tells us how far we are from the nearest edge
+	// Negative = inside, positive = outside
+	float min_dist = min(min(dist1, dist2), dist3);
 
-	// Calculate distance to the edge at this angle
-	// For a regular hexagon, the apothem (perpendicular distance to edge) is r * cos(30°)
-	float apothem = radius * 0.866025; // cos(30°) ≈ 0.866025
-
-	// Distance to edge in the radial direction
-	float edge_dist = abs(dist - apothem);
-
-	// Also check angular distance to corners
-	float corner_angle = segment * 1.047198;
-	float angular_dist = min(abs(angle - corner_angle), abs(angle - (corner_angle + 1.047198)));
-
-	// Combine radial and angular distances
-	return min(edge_dist, angular_dist * dist);
+	// Return absolute distance from edge (0 = on edge, positive = away from edge)
+	return abs(min_dist);
 }
 
 void fragment() {
