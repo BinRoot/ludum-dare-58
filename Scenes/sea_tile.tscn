@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://bajovhkqjeyjs"]
+
+[ext_resource type="Script" uid="uid://dg1fgv8ig8ve8" path="res://Scenes/sea_tile.gd" id="1_fgewa"]
+
+[node name="SeaTile" type="Node3D"]
+script = ExtResource("1_fgewa")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
