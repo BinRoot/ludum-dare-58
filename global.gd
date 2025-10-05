@@ -45,6 +45,12 @@ var globally_caught_fish: Array[Node3D] = []
 var sell_tile_row: int = 0
 var sell_tile_col: int = 0
 
+# Tutorial state
+var is_tutorial_active: bool = true
+var tutorial_first_tank_sold: bool = false
+signal tutorial_started
+signal tutorial_completed
+
 # Utility: compute sell value for a tank given its contained fish and tank reference
 # Rules:
 # 1. More fish = more money
@@ -111,7 +117,7 @@ func _ready():
 	inventory_changed.emit()
 
 	# Start with 15 clams
-	clams = 25
+	clams = 10
 	clams_changed.emit()
 
 func use_item(item_id: StringName) -> bool:

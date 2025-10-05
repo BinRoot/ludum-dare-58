@@ -14,6 +14,8 @@ var restart_button: Button = null
 var win_panel: Panel = null
 var win_label: Label = null
 var win_restart_button: Button = null
+var tutorial_panel: Panel = null
+var tutorial_label: Label = null
 
 func _ready():
 	# Allow the HUD to continue processing while the game is paused
@@ -32,6 +34,9 @@ func _ready():
 	# Connect to growth sequence signals
 	Global.growth_sequence_started.connect(_on_growth_sequence_started)
 	Global.growth_sequence_ended.connect(_on_growth_sequence_ended)
+	# Connect to tutorial signals
+	Global.tutorial_started.connect(_on_tutorial_started)
+	Global.tutorial_completed.connect(_on_tutorial_completed)
 
 	# Create the tank selection label
 	_create_tank_selection_label()
@@ -41,6 +46,8 @@ func _ready():
 	_create_game_over_screen()
 	# Create the win screen
 	_create_win_screen()
+	# Create the tutorial screen
+	_create_tutorial_screen()
 
 	# Initial update
 	_on_inventory_changed()
@@ -115,7 +122,7 @@ func _create_clams_label():
 	clams_container.anchor_right = 1.0
 	clams_container.anchor_top = 0.0
 	clams_container.anchor_bottom = 0.0
-	clams_container.offset_left = -300
+	clams_container.offset_left = -150
 	clams_container.offset_top = 20
 	clams_container.offset_right = -20
 	clams_container.offset_bottom = 70
@@ -366,6 +373,86 @@ func _show_combine_buttons():
 		if child.name == "CombineButtonLayer":
 			child.visible = true
 			return
+
+func _create_tutorial_screen():
+	# Create a semi-transparent panel for tutorial
+	tutorial_panel = Panel.new()
+	tutorial_panel.anchor_left = 0.0
+	tutorial_panel.anchor_top = 0.0
+	tutorial_panel.anchor_right = 1.0
+	tutorial_panel.anchor_bottom = 1.0
+	tutorial_panel.visible = false
+	tutorial_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Allow clicks to pass through
+
+	# Style the panel with semi-transparent background
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = Color(0.0, 0.0, 0.0, 0.0)  # Fully transparent background
+	tutorial_panel.add_theme_stylebox_override("panel", style_box)
+
+	add_child(tutorial_panel)
+
+	# Create tutorial message box
+	var message_box = Panel.new()
+	message_box.name = "TutorialMessageBox"
+	message_box.anchor_left = 0.5
+	message_box.anchor_top = 0.15
+	message_box.anchor_right = 0.5
+	message_box.anchor_bottom = 0.15
+	message_box.offset_left = -350
+	message_box.offset_right = 350
+	message_box.offset_top = -75
+	message_box.offset_bottom = 50
+
+
+	# Style the message box
+	var message_style = StyleBoxFlat.new()
+	message_style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
+	message_style.border_color = Color(0.8, 0.7, 0.3, 1.0)
+	message_style.set_border_width_all(4)
+	message_style.corner_radius_top_left = 10
+	message_style.corner_radius_top_right = 10
+	message_style.corner_radius_bottom_left = 10
+	message_style.corner_radius_bottom_right = 10
+	message_box.add_theme_stylebox_override("panel", message_style)
+
+	tutorial_panel.add_child(message_box)
+
+	# Create tutorial label
+	tutorial_label = Label.new()
+	tutorial_label.text = "Sell your collection to buy more tanks."
+	tutorial_label.add_theme_font_size_override("font_size", 28)
+	tutorial_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.9))
+	tutorial_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	tutorial_label.add_theme_constant_override("outline_size", 2)
+	tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	tutorial_label.anchor_left = 0.0
+	tutorial_label.anchor_top = 0.0
+	tutorial_label.anchor_right = 1.0
+	tutorial_label.anchor_bottom = 1.0
+	tutorial_label.offset_left = 20
+	tutorial_label.offset_right = -20
+	tutorial_label.offset_top = 20
+	tutorial_label.offset_bottom = -20
+
+	message_box.add_child(tutorial_label)
+
+func _on_tutorial_started():
+	print("[HUD] Tutorial started - showing tutorial panel")
+	if tutorial_panel:
+		tutorial_panel.visible = true
+	# Hide inventory during tutorial (but keep clams visible)
+	if inventory_container:
+		inventory_container.visible = false
+
+func _on_tutorial_completed():
+	print("[HUD] Tutorial completed - hiding tutorial panel")
+	if tutorial_panel:
+		tutorial_panel.visible = false
+	# Show inventory after tutorial
+	if inventory_container:
+		inventory_container.visible = true
 
 func _on_inventory_changed():
 	# Update inventory displays for each item type

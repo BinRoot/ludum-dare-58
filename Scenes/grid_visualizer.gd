@@ -362,6 +362,11 @@ func _on_input_event(_camera: Node, event: InputEvent, event_position: Vector3, 
 				print("Cannot buy - tank selection mode active")
 				return
 
+			# Don't allow buying during tutorial
+			if Global.is_tutorial_active:
+				print("Cannot buy - tutorial mode active")
+				return
+
 			# Use hovered_cell if available (more reliable)
 			if hovered_cell.x >= 0 and hovered_cell.y >= 0:
 				var row = hovered_cell.y
@@ -526,6 +531,16 @@ func _process(_delta):
 			cost_icon.visible = false
 		return
 
+	# Don't show cost label during tutorial
+	if Global.is_tutorial_active:
+		if cost_label:
+			cost_label.visible = false
+		if cost_icon:
+			cost_icon.visible = false
+		if hover_highlight:
+			hover_highlight.visible = false
+		return
+
 	# Don't show cost label when a tank is being dragged
 	if tank_is_dragging:
 		if cost_label:
@@ -621,6 +636,10 @@ func _unhandled_input(event: InputEvent):
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			# Don't allow buying during tank selection mode
 			if Global.is_selecting_tank:
+				return
+
+			# Don't allow buying during tutorial
+			if Global.is_tutorial_active:
 				return
 
 			# If we have a valid hovered cell and it's empty, try to buy

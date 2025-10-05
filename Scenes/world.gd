@@ -27,7 +27,7 @@ func _ready():
 	generate_hex_grid()
 	update_fish_references()
 
-	# Store original camera position
+	# Store original camera position for later
 	var camera = get_viewport().get_camera_3d()
 	if camera:
 		original_camera_transform = camera.global_transform
@@ -40,8 +40,22 @@ func _ready():
 	if grid_visualizer and grid_visualizer.has_signal("cell_clicked"):
 		grid_visualizer.cell_clicked.connect(_on_grid_cell_clicked)
 
+	# Set camera to tutorial position immediately (before showing anything)
+	_set_camera_to_tutorial_view()
+
+	# Create initial tank and run tutorial
+	_initialize_game_start()
+
 	# Set up periodic game over check
 	_setup_game_over_check()
+
+# Initialize the game with tank creation and tutorial
+func _initialize_game_start():
+	# Create initial tank with 3 fish
+	await _create_initial_tank_with_fish()
+
+	# Start tutorial sequence (waits for tutorial to complete)
+	await _start_tutorial_sequence()
 
 func _setup_game_over_check():
 	# Check for game over every few seconds
@@ -251,6 +265,108 @@ func _get_random_pond_position() -> Vector3:
 	# Default fallback
 	return pond_bounds.global_position
 
+# Create an initial tank with 3 fish at game start
+func _create_initial_tank_with_fish():
+	print("Creating initial tank with 3 fish...")
+
+	# Create a new fish tank at the center of the tank area
+	var new_tank = fish_tank_scene.instantiate()
+
+	# Set the tank's grid position to center (using Global.house_cell_size for centering)
+	new_tank.row = floor(float(Global.house_cell_size) / 2.0)
+	new_tank.col = floor(float(Global.house_cell_size) / 2.0)
+
+	# Set the bounds reference
+	new_tank.bounds_shape = tank_area
+
+	# Add the tank to the scene
+	add_child(new_tank)
+
+	# Wait for the tank to be ready and positioned
+	await get_tree().process_frame
+
+	print("Initial tank created at position: ", new_tank.global_position)
+
+	# Spawn 3 fish and add them to the tank
+	for i in range(2):
+		var new_fish = fish_scene.instantiate()
+
+		# Set the bounds for the fish (will be updated when added to tank)
+		new_fish.bounds_shape = pond_bounds
+
+		# Position temporarily in the tank area
+		new_fish.global_position = new_tank.global_position
+
+		# Set initial age to 0 for new fish
+		new_fish.age = 0
+
+		# Add to the scene first
+		add_child(new_fish)
+
+		# Wait a frame for the fish to initialize
+		await get_tree().process_frame
+
+		# Now add the fish to the tank (this will position it correctly)
+		new_tank.add_fish(new_fish)
+
+		print("Fish ", i + 1, " added to initial tank")
+
+	print("Initial tank setup complete with 3 fish")
+
+# Start the tutorial sequence
+func _start_tutorial_sequence():
+	# Wait for everything to be initialized
+	await get_tree().create_timer(0.5).timeout
+
+	# Show tutorial UI (camera is already in position)
+	Global.tutorial_started.emit()
+	print("[Tutorial] Started - waiting for tank to be sold")
+
+	# Wait for tutorial to complete (tank sold)
+	await Global.tutorial_completed
+	print("[Tutorial] Completed signal received")
+
+	# Wait a moment before zooming out
+	await get_tree().create_timer(1.0).timeout
+	print("[Tutorial] Zooming camera back to original view")
+
+	# Zoom camera back to original view
+	_animate_camera_to_original()
+	print("[Tutorial] Tutorial sequence finished")
+
+# Set camera to tutorial view instantly (no animation)
+func _set_camera_to_tutorial_view():
+	var camera = get_viewport().get_camera_3d()
+	if not camera or not tank_area:
+		return
+
+	# Calculate the center point between tank area and sell zone
+	var grid_visualizer = get_node_or_null("GridVisualizer")
+	var target_position = tank_area.global_position
+
+	if grid_visualizer and grid_visualizer.has_method("get_sell_zone_bounds"):
+		var sell_bounds = grid_visualizer.get_sell_zone_bounds()
+		if not sell_bounds.is_empty():
+			var sell_pos = sell_bounds["position"] as Vector3
+			# Find midpoint between tank area and sell zone
+			target_position = tank_area.global_position * 0.55 + sell_pos * 0.45
+
+	# Camera position: above and slightly back from the target
+	var camera_offset = Vector3(0, 9, 1)
+	var target_camera_position = target_position + camera_offset
+
+	# Calculate rotation to look at the target area
+	var direction = (target_position - target_camera_position).normalized()
+	var right = direction.cross(Vector3.UP).normalized()
+	var up = right.cross(direction).normalized()
+	var target_basis = Basis(right, up, -direction)
+
+	# Set camera position and rotation instantly
+	camera.global_position = target_camera_position
+	camera.global_transform.basis = target_basis
+
+	print("[Tutorial] Camera set to tutorial view")
+
 # Animate camera to zoom to the tile where fish was caught
 func _animate_camera_to_tile(tile: Node3D, fish: Node3D):
 	var camera = get_viewport().get_camera_3d()
@@ -307,7 +423,7 @@ func _animate_camera_to_tank_area(fish: Node3D):
 	var tank_center = tank_area.global_position
 
 	# Calculate a nice viewing position above and to the side of the tank area
-	var camera_offset = Vector3(0, 12, 5)  # Above and behind
+	var camera_offset = Vector3(0, 16, 5)  # Above and behind
 	var target_camera_position = tank_center + camera_offset
 
 	# Calculate the target rotation (basis) for looking at tank center

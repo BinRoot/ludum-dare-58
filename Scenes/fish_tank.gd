@@ -649,9 +649,20 @@ func _hide_sell_preview():
 		sell_preview_container.visible = false
 
 func _sell_this_tank():
+	print("[Tank] Selling tank - tutorial_active:", Global.is_tutorial_active, " first_sold:", Global.tutorial_first_tank_sold)
+
 	# Calculate value and award clams
 	var value := Global.compute_tank_sell_value(contained_fish, self)
 	Global.add_clams(value)
+
+	# Check if this is the first tank sold during tutorial
+	if Global.is_tutorial_active and not Global.tutorial_first_tank_sold:
+		print("[Tank] First tutorial tank sold - marking as complete")
+		Global.tutorial_first_tank_sold = true
+		Global.is_tutorial_active = false
+		# Emit signal immediately - it will propagate even if tank gets freed
+		Global.tutorial_completed.emit()
+		print("[Tank] Tutorial completed signal emitted")
 
 	# Free all contained fish
 	for fish in contained_fish:
