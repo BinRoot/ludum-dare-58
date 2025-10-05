@@ -219,9 +219,10 @@ func _create_net_visual():
 
 		net_visual.set_surface_override_material(0, net_material)
 
-		# Position it just above the water surface - NO rotation needed for horizontal
+		# Position it just above the water surface
 		net_visual.position = Vector3(0, 0.85, 0)
-		# Cylinder is already oriented vertically, so it naturally lies flat on XZ plane
+		# Rotate 45 degrees around Y axis for diagonal net pattern
+		net_visual.rotation_degrees.y = 45
 		add_child(net_visual)
 
 func _remove_net_visual():

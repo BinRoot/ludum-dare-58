@@ -486,7 +486,7 @@ func _is_over_sell_tile() -> bool:
 func _show_sell_preview():
 	if sell_preview_label == null:
 		return
-	var price := Global.compute_tank_sell_value(contained_fish)
+	var price := Global.compute_tank_sell_value(contained_fish, self)
 	sell_preview_label.text = "+" + str(price) + " clams"
 	sell_preview_label.modulate = Color(0.9, 1.0, 0.6)
 	sell_preview_label.visible = true
@@ -497,7 +497,7 @@ func _hide_sell_preview():
 
 func _sell_this_tank():
 	# Calculate value and award clams
-	var value := Global.compute_tank_sell_value(contained_fish)
+	var value := Global.compute_tank_sell_value(contained_fish, self)
 	Global.add_clams(value)
 
 	# Free all contained fish

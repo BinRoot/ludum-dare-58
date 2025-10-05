@@ -5,7 +5,7 @@ extends Node3D
 @export var grid_color: Color = Color(0.8, 0.7, 1, 0.6)
 @export var show_grid: bool = true
 @export var bounds_shape: Node3D  # Reference to boundary (same as fish tanks)
-@export var tank_cost: int = 5  # Cost of a tank in clams
+@export var tank_cost: int = 20  # Cost of a tank in clams
 
 var mesh_instance: MeshInstance3D
 var cell_size: float = 1.0

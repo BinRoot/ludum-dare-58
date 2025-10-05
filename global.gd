@@ -33,57 +33,58 @@ var globally_caught_fish: Array[Node3D] = []
 var sell_tile_row: int = 0
 var sell_tile_col: int = 0
 
-# Utility: compute sell value for a tank given its contained fish colors
-# Rules: 1 base clam for empty tank, +3 per fish, and x2 multiplier
-# if all fish hues fall within a small hue range (same-color heuristic)
-func compute_tank_sell_value(fish_list: Array) -> int:
+# Utility: compute sell value for a tank given its contained fish and tank reference
+# Rules:
+# 1. More fish = more money
+# 2. Bigger fish = more money
+# 3. 2 big fish > 1 small fish
+# 4. Bigger tank = more money
+func compute_tank_sell_value(fish_list: Array, tank: Node3D = null) -> int:
 	var base_value: int = 1
-	var fish_count: int = 0
-	var hues: Array = []
 
+	# Calculate tank size bonus (bigger tanks are worth more)
+	var tank_size_bonus: float = 0.0
+	if tank and "width" in tank and "height" in tank:
+		var tank_area = tank.width * tank.height
+		tank_size_bonus = tank_area * 2.0  # 2 clams per grid cell
+
+	# Calculate total fish value based on size
+	var fish_value: float = 0.0
 	for fish in fish_list:
 		if fish and is_instance_valid(fish):
-			fish_count += 1
-			# Try to read a representative color; fall back to white
-			var c: Color = Color(1, 1, 1)
-			if "base_color" in fish:
-				c = fish.base_color
-			elif fish.has_method("get_color"):
-				c = fish.get_color()
-			hues.append(c.h)
+			# Calculate fish size based on graph complexity (same method as tank capacity)
+			var fish_size = _calculate_fish_size(fish)
+			# Each unit of fish size is worth 0.5 clams
+			fish_value += fish_size * 0.5
 
-	var value: int = base_value + (fish_count * 3)
+	# Total value = base + tank size + fish value
+	var total_value: float = base_value + tank_size_bonus + fish_value
 
-	if fish_count > 1 and _hues_within_same_range(hues):
-		value *= 2
+	return int(ceil(total_value))
 
-	return value
+# Calculate fish size based on graph complexity
+func _calculate_fish_size(fish: Node3D) -> float:
+	if not fish or not "graph" in fish:
+		return 10.0  # Default size if fish has no graph
 
-# Determine if all hues are within a threshold when accounting for wrap-around
-func _hues_within_same_range(hues: Array) -> bool:
-	if hues.size() <= 1:
-		return true
+	var graph = fish.graph
+	if graph.size() == 0:
+		return 10.0
 
-	# Sort hues for easier span checks
-	hues.sort()
-	var threshold: float = 0.08  # ~30 degrees on hue circle (0..1)
+	# Count unique nodes in the graph
+	var nodes_set = {}
+	for edge in graph:
+		nodes_set[edge.x] = true
+		nodes_set[edge.y] = true
 
-	# Direct span
-	var span_direct: float = hues[hues.size() - 1] - hues[0]
-	if span_direct <= threshold:
-		return true
+	var num_nodes = nodes_set.size()
+	var num_edges = graph.size()
 
-	# Wrapped span: map hues < first+threshold to +1 space to check wrap-around
-	var wrapped: Array = []
-	var base: float = hues[0]
-	for h in hues:
-		var hw: float = h
-		if h < base:
-			hw = h + 1.0
-		wrapped.append(hw)
-	wrapped.sort()
-	var span_wrapped: float = wrapped[wrapped.size() - 1] - wrapped[0]
-	return span_wrapped <= threshold
+	# Size is based on graph complexity (same formula as tank volume calculation)
+	# More nodes and edges = more complex = larger size
+	var size = (num_nodes * 5.0) + (num_edges * 3.0)
+
+	return size
 
 func _ready():
 	# Create the net item
