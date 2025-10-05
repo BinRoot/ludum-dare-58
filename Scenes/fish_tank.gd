@@ -324,7 +324,7 @@ func _update_hover_effect():
 
 	# Show/hide capacity bar based on hover state
 	if capacity_bar_container:
-		capacity_bar_container.visible = is_hovered and not is_dragging
+		capacity_bar_container.visible = is_hovered and not is_dragging and current_capacity > 0
 
 func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int):
 	if event is InputEventMouseButton:
@@ -924,9 +924,10 @@ func _kill_fish(fish: Node3D):
 	var death_tween = create_tween()
 	death_tween.set_parallel(true)
 
-	# Float upward (to heaven)
+	# Float upward (to heaven) along world up
 	var float_distance = 10.0
-	death_tween.tween_property(fish, "global_position:y", fish.global_position.y + float_distance, 2.5).set_ease(Tween.EASE_OUT)
+	var target_pos = fish.global_position + Vector3(0, float_distance, 0)
+	death_tween.tween_property(fish, "global_position", target_pos, 2.5).set_ease(Tween.EASE_OUT)
 
 	# Rotate while floating
 	death_tween.tween_property(fish, "rotation:y", fish.rotation.y + PI * 2, 2.5)

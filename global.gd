@@ -94,7 +94,7 @@ func _ready():
 	net_item = ItemData.new()
 	net_item.id = "net"
 	net_item.display_name = "Net"
-	net_item.icon = load("res://icon.svg")
+	net_item.icon = load("res://net.svg")
 	items.append(net_item)
 
 	# Start with 3 nets

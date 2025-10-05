@@ -109,7 +109,7 @@ func _create_game_over_screen():
 
 	# Create game over label
 	game_over_label = Label.new()
-	game_over_label.text = "GAME OVER\n\nYou have no tanks and no money!"
+	game_over_label.text = "GAME OVER\n\nYou don't have enough clams to buy a tank!"
 	game_over_label.add_theme_font_size_override("font_size", 48)
 	game_over_label.add_theme_color_override("font_color", Color.RED)
 	game_over_label.add_theme_color_override("font_outline_color", Color.BLACK)
