@@ -27,6 +27,8 @@ var static_body: StaticBody3D
 var material: StandardMaterial3D
 var frame_mesh_instance: MeshInstance3D
 var water_mesh_instance: MeshInstance3D
+var sell_preview_container: Node3D = null
+var sell_preview_icon: Sprite3D = null
 var sell_preview_label: Label3D = null
 
 # Static array to track all tanks (for collision detection)
@@ -264,24 +266,45 @@ func _create_water():
 
 	add_child(water_mesh_instance)
 
-	# Create sell preview label (hidden by default)
-	sell_preview_label = Label3D.new()
-	sell_preview_label.text = ""
-	sell_preview_label.font_size = 28
-	sell_preview_label.modulate = Color(1.0, 1.0, 0.6)
-	sell_preview_label.outline_modulate = Color.BLACK
-	sell_preview_label.outline_size = 4
-	sell_preview_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sell_preview_label.visible = false
-	sell_preview_label.pixel_size = 0.03
-	sell_preview_label.no_depth_test = true
-	sell_preview_label.render_priority = 10
-	# Position above tank center
-	sell_preview_label.position = Vector3(0, tank_height + 0.6, 0)
-	add_child(sell_preview_label)
+	# Create sell preview (icon + text, hidden by default)
+	_create_sell_preview()
 
 	# Create capacity progress bar
 	_create_capacity_bar()
+
+func _create_sell_preview():
+	# Create a container to hold both icon and text
+	sell_preview_container = Node3D.new()
+	sell_preview_container.position = Vector3(0, tank_height + 0.6, 0)  # Above tank center
+	sell_preview_container.visible = false
+	add_child(sell_preview_container)
+
+	# Create coin icon (smaller)
+	sell_preview_icon = Sprite3D.new()
+	sell_preview_icon.texture = load("res://coin.svg")
+	sell_preview_icon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sell_preview_icon.no_depth_test = true
+	sell_preview_icon.render_priority = 11  # Render in front of label
+	sell_preview_icon.pixel_size = 0.008  # Much smaller icon
+	# Position icon to the left
+	sell_preview_icon.position = Vector3(-0.6, 0, 0)
+	sell_preview_container.add_child(sell_preview_icon)
+
+	# Create text label (larger and more visible)
+	sell_preview_label = Label3D.new()
+	sell_preview_label.text = ""
+	sell_preview_label.font_size = 32  # Larger font
+	sell_preview_label.modulate = Color(1.0, 1.0, 0.6)
+	sell_preview_label.outline_modulate = Color.BLACK
+	sell_preview_label.outline_size = 8  # Thicker outline for better visibility
+	sell_preview_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sell_preview_label.pixel_size = 0.035  # Larger pixel size
+	sell_preview_label.no_depth_test = true
+	sell_preview_label.render_priority = 11  # Same as icon
+	sell_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Position text to the right of icon
+	sell_preview_label.position = Vector3(0.8, 0, -0.8)
+	sell_preview_container.add_child(sell_preview_label)
 
 func _setup_interaction():
 	# Create static body for mouse picking
@@ -602,16 +625,16 @@ func _is_mouse_over_sell_zone() -> bool:
 
 
 func _show_sell_preview():
-	if sell_preview_label == null:
+	if sell_preview_container == null or sell_preview_label == null:
 		return
 	var price := Global.compute_tank_sell_value(contained_fish, self)
-	sell_preview_label.text = "+" + str(price) + " clams"
+	sell_preview_label.text = "+" + str(price)
 	sell_preview_label.modulate = Color(0.9, 1.0, 0.6)
-	sell_preview_label.visible = true
+	sell_preview_container.visible = true
 
 func _hide_sell_preview():
-	if sell_preview_label:
-		sell_preview_label.visible = false
+	if sell_preview_container:
+		sell_preview_container.visible = false
 
 func _sell_this_tank():
 	# Calculate value and award clams

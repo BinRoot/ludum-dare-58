@@ -217,7 +217,6 @@ func _create_cost_label():
 
 func _create_sell_marker():
 	# Create sell zone OUTSIDE the grid (to the right side)
-	var total_size_x = grid_size * cell_size
 	var sell_zone_size = Vector3(cell_size * 1.5, 0.5, cell_size * 1.5)
 
 	# Position sell zone to the right of the grid with some spacing
@@ -270,6 +269,7 @@ func _create_sell_marker():
 	sell_label.no_depth_test = true
 	sell_label.render_priority = 10
 	sell_label.position = Vector3(0, 1.5, 0)  # Relative to sell_zone
+	sell_label.visible = false  # Hidden by default, only show when dragging a tank
 	sell_zone.add_child(sell_label)
 
 # Helper function to get the sell zone's global bounds
@@ -407,6 +407,13 @@ func _is_any_tank_dragging() -> bool:
 	return false
 
 func _process(_delta):
+	# Show sell label only when a tank is being dragged
+	var tank_is_dragging = _is_any_tank_dragging()
+	if sell_label:
+		sell_label.visible = tank_is_dragging
+	if sell_marker:
+		sell_marker.visible = tank_is_dragging
+
 	# Don't show cost label during tank selection mode
 	if Global.is_selecting_tank:
 		if cost_label:
@@ -424,7 +431,7 @@ func _process(_delta):
 		return
 
 	# Don't show cost label when a tank is being dragged
-	if _is_any_tank_dragging():
+	if tank_is_dragging:
 		if cost_label:
 			cost_label.visible = false
 		if cost_icon:
@@ -511,11 +518,7 @@ func _unhandled_input(event: InputEvent):
 					_try_buy_tank(row, col)
 
 func _on_tank_selection_started():
-	# Hide the sell label and grid lines during tank selection
-	if sell_label:
-		sell_label.visible = false
-	if sell_marker:
-		sell_marker.visible = false
+	# Hide grid lines during tank selection (sell label controlled by _process)
 	if mesh_instance:
 		mesh_instance.visible = false
 	if cost_label:
@@ -524,33 +527,21 @@ func _on_tank_selection_started():
 		cost_icon.visible = false
 
 func _on_fish_placed():
-	# Show the sell label and grid lines again after placing the fish
-	if sell_label:
-		sell_label.visible = true
-	if sell_marker:
-		sell_marker.visible = true
+	# Show grid lines again after placing the fish (sell label controlled by _process)
 	if mesh_instance:
 		mesh_instance.visible = true
 
 func _on_growth_sequence_started():
-	# Hide all grid elements during growth sequence
+	# Hide grid elements during growth sequence (sell label controlled by _process)
 	if mesh_instance:
 		mesh_instance.visible = false
 	if cost_label:
 		cost_label.visible = false
 	if cost_icon:
 		cost_icon.visible = false
-	if sell_label:
-		sell_label.visible = false
-	if sell_marker:
-		sell_marker.visible = false
 
 func _on_growth_sequence_ended():
-	# Show grid elements again after growth sequence
+	# Show grid elements again after growth sequence (sell label controlled by _process)
 	if mesh_instance:
 		mesh_instance.visible = true
-	if sell_label:
-		sell_label.visible = true
-	if sell_marker:
-		sell_marker.visible = true
-	# Note: cost_label visibility is controlled by _process() based on hover state
+	# Note: cost_label and sell_label visibility is controlled by _process() based on state
