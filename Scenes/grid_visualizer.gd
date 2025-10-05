@@ -18,7 +18,8 @@ var cost_label: Label3D = null
 var cost_icon: Sprite3D = null
 var is_mouse_over_grid: bool = false
 
-# Sell tile visuals
+# Sell tile visuals (now outside the grid)
+var sell_zone: Area3D = null
 var sell_marker: MeshInstance3D = null
 var sell_label: Label3D = null
 
@@ -215,18 +216,36 @@ func _create_cost_label():
 	print("Cost label created at grid position: ", global_position)
 
 func _create_sell_marker():
-	# Visual indicator for the sell tile cell
-	var col: int = Global.sell_tile_col
-	var row: int = Global.sell_tile_row
+	# Create sell zone OUTSIDE the grid (to the right side)
+	var total_size_x = grid_size * cell_size
+	var sell_zone_size = Vector3(cell_size * 1.5, 0.5, cell_size * 1.5)
 
-	# Safety: clamp within grid
-	col = clamp(col, 0, grid_size - 1)
-	row = clamp(row, 0, grid_size - 1)
+	# Position sell zone to the right of the grid with some spacing
+	var sell_zone_position = Vector3(
+		- cell_size * 1.5,  # Right of the grid
+		0.25,  # Slightly elevated
+		grid_size * cell_size / 2.0  # Centered vertically
+	)
 
-	# Create a flat plane marker
+	# Create Area3D for the sell zone
+	sell_zone = Area3D.new()
+	sell_zone.collision_layer = 32  # Use layer 32 for sell zone
+	sell_zone.collision_mask = 0
+	sell_zone.position = sell_zone_position
+	add_child(sell_zone)
+
+	# Add collision shape to the sell zone
+	var collision = CollisionShape3D.new()
+	collision.name = "CollisionShape3D"  # Set the name so we can find it later
+	var shape = BoxShape3D.new()
+	shape.size = sell_zone_size
+	collision.shape = shape
+	sell_zone.add_child(collision)
+
+	# Create visual marker (larger since it's outside the grid)
 	sell_marker = MeshInstance3D.new()
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(cell_size * 0.9, cell_size * 0.9)
+	plane.size = Vector2(sell_zone_size.x * 0.9, sell_zone_size.z * 0.9)
 	sell_marker.mesh = plane
 
 	var mat := StandardMaterial3D.new()
@@ -236,27 +255,46 @@ func _create_sell_marker():
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	sell_marker.set_surface_override_material(0, mat)
 
-	# Position at the center of the sell tile cell (local space; grid is at boundary origin)
-	sell_marker.position = Vector3(
-		col * cell_size + cell_size / 2.0,
-		0.02,
-		row * cell_size + cell_size / 2.0
-	)
-	add_child(sell_marker)
+	sell_marker.position = Vector3(0, -0.23, 0)  # Relative to sell_zone
+	sell_zone.add_child(sell_marker)
 
 	# Floating label above the marker
 	sell_label = Label3D.new()
-	sell_label.text = "Sell"
-	sell_label.font_size = 24
+	sell_label.text = "Sell Here"
+	sell_label.font_size = 32
 	sell_label.modulate = Color(1.0, 0.95, 0.5)
 	sell_label.outline_modulate = Color.BLACK
-	sell_label.outline_size = 4
+	sell_label.outline_size = 6
 	sell_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sell_label.pixel_size = 0.03
+	sell_label.pixel_size = 0.035
 	sell_label.no_depth_test = true
 	sell_label.render_priority = 10
-	sell_label.position = sell_marker.position + Vector3(0, 1.2, 0)
-	add_child(sell_label)
+	sell_label.position = Vector3(0, 1.5, 0)  # Relative to sell_zone
+	sell_zone.add_child(sell_label)
+
+# Helper function to get the sell zone's global bounds
+func get_sell_zone_bounds() -> Dictionary:
+	if not sell_zone:
+		print("[GridViz] get_sell_zone_bounds: sell_zone is null!")
+		return {}
+
+	var zone_pos = sell_zone.global_position
+	var zone_collision = sell_zone.get_node("CollisionShape3D") as CollisionShape3D
+	if not zone_collision:
+		print("[GridViz] get_sell_zone_bounds: collision shape not found!")
+		return {}
+
+	var shape = zone_collision.shape as BoxShape3D
+	if not shape:
+		print("[GridViz] get_sell_zone_bounds: shape is not BoxShape3D!")
+		return {}
+
+	var result = {
+		"position": zone_pos,
+		"size": shape.size
+	}
+	print("[GridViz] get_sell_zone_bounds: returning pos=", zone_pos, " size=", shape.size)
+	return result
 
 func _on_mouse_entered():
 	is_mouse_over_grid = true
@@ -314,10 +352,7 @@ func _on_input_event(_camera: Node, event: InputEvent, event_position: Vector3, 
 func _try_buy_tank(row: int, col: int):
 	print("=== _try_buy_tank called for row:", row, " col:", col, " ===")
 
-	# Don't allow buying on the sell tile
-	if row == Global.sell_tile_row and col == Global.sell_tile_col:
-		print("Cannot buy tank on sell tile!")
-		return
+	# No need to check for sell tile anymore since it's outside the grid
 
 	# Check if cell is already occupied
 	var is_occupied = _is_cell_occupied(row, col)
@@ -435,11 +470,8 @@ func _process(_delta):
 				cost_icon.global_position = global_position + cell_center + icon_offset
 				cost_label.global_position = global_position + cell_center + label_offset
 
-				# Don't show cost label on sell tile or occupied cells
-				if row == Global.sell_tile_row and col == Global.sell_tile_col:
-					cost_label.visible = false
-					cost_icon.visible = false
-				elif not _is_cell_occupied(row, col):
+				# Don't show cost label on occupied cells (no sell tile check needed)
+				if not _is_cell_occupied(row, col):
 					cost_label.text = str(tank_cost)
 					if Global.get_clams() >= tank_cost:
 						cost_label.modulate = Color.GREEN

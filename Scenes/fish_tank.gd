@@ -387,9 +387,23 @@ func _end_drag():
 	if is_dragging:
 		is_dragging = false
 
+		print("=== END DRAG at position: ", global_position, " ===")
+
+		# Check if dropped over sell zone BEFORE snapping to grid
+		var over_sell_1 = _is_over_sell_tile()
+		var over_sell_2 = _is_mouse_over_sell_zone()
+		print("_is_over_sell_tile() = ", over_sell_1)
+		print("_is_mouse_over_sell_zone() = ", over_sell_2)
+
+		if over_sell_1 or over_sell_2:
+			print("SELLING TANK!")
+			_sell_this_tank()
+			return
+
 		# Store previous position in case we need to revert
 		var prev_row = row
 		var prev_col = col
+
 
 		# Snap to grid
 		_snap_to_grid()
@@ -404,12 +418,8 @@ func _end_drag():
 
 		_update_hover_effect()
 
-		# If dropped over sell tile, execute sale
-		if _is_over_sell_tile():
-			_sell_this_tank()
-		else:
-			# Update combine buttons after moving
-			_update_all_tanks_combine_buttons()
+		# Update combine buttons after moving
+		_update_all_tanks_combine_buttons()
 
 func _process(_delta):
 	if is_dragging:
@@ -442,7 +452,7 @@ func _update_drag_visual_feedback():
 	material.albedo_color = Color(0.3, 1.0, 0.3, 0.4)
 
 	# If hovering over sell tile, show price preview
-	if _is_over_sell_tile():
+	if _is_over_sell_tile() or _is_mouse_over_sell_zone():
 		_show_sell_preview()
 	else:
 		_hide_sell_preview()
@@ -490,11 +500,106 @@ func _update_grid_from_position():
 	row = int((local_pos.z - (height * cell_size / 2.0)) / cell_size)
 
 func _is_over_sell_tile() -> bool:
-	# Determine if current bounds overlap the configured sell tile cell
-	var sell_row: int = Global.sell_tile_row
-	var sell_col: int = Global.sell_tile_col
-	var bounds: Dictionary = get_grid_bounds()
-	return sell_row >= bounds.row and sell_row < bounds.row + bounds.height and sell_col >= bounds.col and sell_col < bounds.col + bounds.width
+	# Check if tank overlaps with the sell zone (which is now outside the grid)
+	var grid_visualizer: Node = _get_grid_visualizer()
+	if not grid_visualizer:
+		print("[SellCheck] GridVisualizer not found!")
+		return false
+	if not grid_visualizer.has_method("get_sell_zone_bounds"):
+		print("[SellCheck] GridVisualizer doesn't have get_sell_zone_bounds method!")
+		return false
+
+	var sell_bounds: Dictionary = grid_visualizer.get_sell_zone_bounds()
+	if sell_bounds.is_empty():
+		print("[SellCheck] sell_bounds is empty!")
+		return false
+	if not sell_bounds.has("position") or not sell_bounds.has("size"):
+		print("[SellCheck] sell_bounds missing position or size!")
+		return false
+
+	var sell_pos := sell_bounds["position"] as Vector3
+	var sell_size := sell_bounds["size"] as Vector3
+
+	# Calculate tank bounds in world space
+	var tank_pos: Vector3 = global_position
+	var tank_half_width: float = (width * cell_size) / 2.0
+	var tank_half_height: float = (height * cell_size) / 2.0
+
+	# Axis-aligned rectangle overlap in X/Z (AABB vs AABB) with a margin
+	var margin: float = cell_size * 0.2
+
+	var tank_left: float = tank_pos.x - tank_half_width - margin
+	var tank_right: float = tank_pos.x + tank_half_width + margin
+	var tank_top: float = tank_pos.z - tank_half_height - margin
+	var tank_bottom: float = tank_pos.z + tank_half_height + margin
+
+	var zone_half_x: float = sell_size.x * 0.5
+	var zone_half_z: float = sell_size.z * 0.5
+	var zone_left: float = sell_pos.x - zone_half_x
+	var zone_right: float = sell_pos.x + zone_half_x
+	var zone_top: float = sell_pos.z - zone_half_z
+	var zone_bottom: float = sell_pos.z + zone_half_z
+
+	var separated: bool = tank_left > zone_right or tank_right < zone_left or tank_top > zone_bottom or tank_bottom < zone_top
+	var over: bool = not separated
+	print("[SellCheck] tank[", tank_left, ",", tank_right, "] x [", tank_top, ",", tank_bottom, "] vs zone[", zone_left, ",", zone_right, "] x [", zone_top, ",", zone_bottom, "] => ", over)
+	return over
+
+func _get_grid_visualizer() -> Node:
+	# Find the grid visualizer in the scene with robust fallbacks
+	var world: Node = get_parent()
+	if world:
+		var gv := world.get_node_or_null("GridVisualizer")
+		if gv:
+			return gv
+		# Deep search under world
+		var found := world.find_child("GridVisualizer", true, false)
+		if found:
+			return found
+	# Last resort: search from scene tree root
+	var root := get_tree().root
+	if root:
+		var found_root := root.find_child("GridVisualizer", true, false)
+		if found_root:
+			return found_root
+	return null
+
+# Additional sell zone check using the mouse pointer projected onto ground plane
+func _is_mouse_over_sell_zone() -> bool:
+	var grid_visualizer: Node = _get_grid_visualizer()
+	if not grid_visualizer or not grid_visualizer.has_method("get_sell_zone_bounds"):
+		return false
+
+	var sell_bounds: Dictionary = grid_visualizer.get_sell_zone_bounds()
+	if sell_bounds.is_empty():
+		return false
+	if not sell_bounds.has("position") or not sell_bounds.has("size"):
+		return false
+
+	var sell_pos := sell_bounds["position"] as Vector3
+	var sell_size := sell_bounds["size"] as Vector3
+
+	var camera := get_viewport().get_camera_3d()
+	if not camera:
+		return false
+
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	var ray_origin: Vector3 = camera.project_ray_origin(mouse_pos)
+	var ray_dir: Vector3 = camera.project_ray_normal(mouse_pos)
+	# Intersect with a plane at the sell zone's Y level for better accuracy
+	var plane := Plane(Vector3.UP, -sell_pos.y)
+	var hit: Variant = plane.intersects_ray(ray_origin, ray_dir)
+	if not hit:
+		return false
+
+	var point: Vector3 = hit
+
+	var zone_half_x: float = sell_size.x * 0.5
+	var zone_half_z: float = sell_size.z * 0.5
+	var in_x: bool = point.x >= (sell_pos.x - zone_half_x) and point.x <= (sell_pos.x + zone_half_x)
+	var in_z: bool = point.z >= (sell_pos.z - zone_half_z) and point.z <= (sell_pos.z + zone_half_z)
+	return in_x and in_z
+
 
 func _show_sell_preview():
 	if sell_preview_label == null:
