@@ -17,6 +17,10 @@ signal clams_changed
 var is_game_over: bool = false
 signal game_over
 
+# Win state
+var has_won: bool = false
+signal game_won
+
 # Economy config
 var tank_cost: int = 20
 
@@ -107,7 +111,7 @@ func _ready():
 	inventory_changed.emit()
 
 	# Start with 15 clams
-	clams = 115
+	clams = 515
 	clams_changed.emit()
 
 func use_item(item_id: StringName) -> bool:
@@ -182,5 +186,31 @@ func check_game_over() -> bool:
 		is_game_over = true
 		game_over.emit()
 		return true
+
+	return false
+
+# Check for win condition - single tank that fills the entire grid
+func check_win_condition() -> bool:
+	if has_won:
+		return true
+
+	# Load the fish tank script to access all_tanks
+	var fish_tank_script = load("res://Scenes/fish_tank.gd")
+	if not fish_tank_script or not "all_tanks" in fish_tank_script:
+		return false
+
+	var all_tanks = fish_tank_script.all_tanks
+
+	# Check if any tank is the full grid size
+	# (This handles timing issues where old tanks haven't been removed yet)
+	for tank in all_tanks:
+		if tank and is_instance_valid(tank):
+			if "width" in tank and "height" in tank:
+				# Check if the tank occupies the full grid (5x5)
+				if tank.width == house_cell_size and tank.height == house_cell_size:
+					has_won = true
+					game_won.emit()
+					print("WIN CONDITION MET! Tank size: ", tank.width, "x", tank.height)
+					return true
 
 	return false

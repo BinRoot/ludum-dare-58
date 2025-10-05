@@ -11,6 +11,9 @@ var clams_label: Label = null
 var game_over_panel: Panel = null
 var game_over_label: Label = null
 var restart_button: Button = null
+var win_panel: Panel = null
+var win_label: Label = null
+var win_restart_button: Button = null
 
 func _ready():
 	# Allow the HUD to continue processing while the game is paused
@@ -24,6 +27,8 @@ func _ready():
 	Global.clams_changed.connect(_on_clams_changed)
 	# Connect to game over signal
 	Global.game_over.connect(_on_game_over)
+	# Connect to win signal
+	Global.game_won.connect(_on_game_won)
 	# Connect to growth sequence signals
 	Global.growth_sequence_started.connect(_on_growth_sequence_started)
 	Global.growth_sequence_ended.connect(_on_growth_sequence_ended)
@@ -34,6 +39,8 @@ func _ready():
 	_create_clams_label()
 	# Create the game over screen
 	_create_game_over_screen()
+	# Create the win screen
+	_create_win_screen()
 
 	# Initial update
 	_on_inventory_changed()
@@ -212,10 +219,101 @@ func _create_game_over_screen():
 
 	game_over_panel.add_child(restart_button)
 
+func _create_win_screen():
+	# Create a semi-transparent dark panel that covers the screen
+	win_panel = Panel.new()
+	win_panel.anchor_left = 0.0
+	win_panel.anchor_right = 1.0
+	win_panel.anchor_top = 0.0
+	win_panel.anchor_bottom = 1.0
+	win_panel.visible = false
+
+	# Style the panel with a golden tint
+	var style_box = StyleBoxFlat.new()
+	style_box.bg_color = Color(0.1, 0.2, 0.1, 0.85)  # Dark green tint
+	win_panel.add_theme_stylebox_override("panel", style_box)
+
+	add_child(win_panel)
+
+	# Create win label
+	win_label = Label.new()
+	win_label.text = "CONGRATULATIONS!\n\nYou built the ultimate aquarium!"
+	win_label.add_theme_font_size_override("font_size", 48)
+	win_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.3, 1.0))  # Bright green
+	win_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	win_label.add_theme_constant_override("outline_size", 8)
+	win_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	win_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	win_label.anchor_left = 0.0
+	win_label.anchor_right = 1.0
+	win_label.anchor_top = 0.15
+	win_label.anchor_bottom = 0.5
+
+	win_panel.add_child(win_label)
+
+	# Create restart button
+	win_restart_button = Button.new()
+	win_restart_button.text = "PLAY AGAIN"
+	win_restart_button.custom_minimum_size = Vector2(300, 80)
+	win_restart_button.add_theme_font_size_override("font_size", 36)
+
+	# Style the button with green theme
+	var button_normal = StyleBoxFlat.new()
+	button_normal.bg_color = Color(0.2, 0.8, 0.2, 0.9)
+	button_normal.border_color = Color(0.3, 1.0, 0.3, 1.0)
+	button_normal.set_border_width_all(3)
+	button_normal.corner_radius_top_left = 10
+	button_normal.corner_radius_top_right = 10
+	button_normal.corner_radius_bottom_left = 10
+	button_normal.corner_radius_bottom_right = 10
+	win_restart_button.add_theme_stylebox_override("normal", button_normal)
+
+	var button_hover = StyleBoxFlat.new()
+	button_hover.bg_color = Color(0.3, 1.0, 0.3, 1.0)
+	button_hover.border_color = Color(0.5, 1.0, 0.5, 1.0)
+	button_hover.set_border_width_all(3)
+	button_hover.corner_radius_top_left = 10
+	button_hover.corner_radius_top_right = 10
+	button_hover.corner_radius_bottom_left = 10
+	button_hover.corner_radius_bottom_right = 10
+	win_restart_button.add_theme_stylebox_override("hover", button_hover)
+
+	var button_pressed = StyleBoxFlat.new()
+	button_pressed.bg_color = Color(0.1, 0.6, 0.1, 1.0)
+	button_pressed.border_color = Color(0.2, 0.8, 0.2, 1.0)
+	button_pressed.set_border_width_all(3)
+	button_pressed.corner_radius_top_left = 10
+	button_pressed.corner_radius_top_right = 10
+	button_pressed.corner_radius_bottom_left = 10
+	button_pressed.corner_radius_bottom_right = 10
+	win_restart_button.add_theme_stylebox_override("pressed", button_pressed)
+
+	# Position the button horizontally centered, but lower vertically
+	win_restart_button.anchor_left = 0.5
+	win_restart_button.anchor_right = 0.5
+	win_restart_button.anchor_top = 0.65
+	win_restart_button.anchor_bottom = 0.65
+	win_restart_button.offset_left = -150
+	win_restart_button.offset_right = 150
+	win_restart_button.offset_top = -40
+	win_restart_button.offset_bottom = 40
+
+	# Connect button signal (reuse the same restart function)
+	win_restart_button.pressed.connect(_on_restart_pressed)
+
+	win_panel.add_child(win_restart_button)
+
 func _on_game_over():
 	print("Game Over!")
 	if game_over_panel:
 		game_over_panel.visible = true
+	# Pause the game
+	get_tree().paused = true
+
+func _on_game_won():
+	print("You Win!")
+	if win_panel:
+		win_panel.visible = true
 	# Pause the game
 	get_tree().paused = true
 
@@ -230,6 +328,8 @@ func _on_restart_pressed():
 func _reset_game_state():
 	# Reset game over flag
 	Global.is_game_over = false
+	# Reset win flag
+	Global.has_won = false
 
 	# Reset money to starting amount
 	Global.clams = 15

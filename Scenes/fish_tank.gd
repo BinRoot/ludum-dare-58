@@ -1336,6 +1336,9 @@ func _combine_with_tank(other_tank: Node3D):
 	# Update combine buttons for all tanks
 	_update_all_tanks_combine_buttons()
 
+	# Check for win condition after combining
+	Global.call_deferred("check_win_condition")
+
 # Recreate tank visuals with new dimensions
 func _recreate_tank_visuals():
 	# Remove old visuals
