@@ -43,6 +43,7 @@ var current_capacity: float = 0.0  # Current capacity based on fish volumes
 var capacity_bar: ProgressBar = null  # UI progress bar for capacity
 var capacity_bar_container: Control = null  # Container for the progress bar
 var capacity_bar_sprite: Sprite3D = null  # 3D sprite displaying the capacity bar
+var capacity_title_label: Label = null  # "Capacity" title label (shown only when camera is close)
 
 # Combine button system
 var combine_buttons: Dictionary = {}  # Maps adjacent tank to button node
@@ -361,6 +362,18 @@ func _update_hover_effect():
 	# Show/hide capacity bar sprite based on hover state
 	if capacity_bar_sprite:
 		capacity_bar_sprite.visible = is_hovered and not is_dragging and current_capacity > 0
+
+		# Show/hide capacity title label based on camera distance
+		if capacity_title_label and capacity_bar_sprite.visible:
+			var camera = get_viewport().get_camera_3d()
+			if camera:
+				var distance = global_position.distance_to(camera.global_position)
+				# Show label only if camera is within 15 units of the tank
+				capacity_title_label.visible = distance < 15.0
+			else:
+				capacity_title_label.visible = true
+		elif capacity_title_label:
+			capacity_title_label.visible = false
 
 func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int):
 	if event is InputEventMouseButton:
@@ -943,6 +956,16 @@ func _create_capacity_bar():
 	capacity_bar.value = 0
 	capacity_bar.show_percentage = false
 	capacity_bar_container.add_child(capacity_bar)
+
+	# Add "Capacity" title label (after progress bar so it renders on top)
+	capacity_title_label = Label.new()
+	capacity_title_label.text = "Capacity"
+	capacity_title_label.position = Vector2(35, 25)
+	capacity_title_label.add_theme_font_size_override("font_size", 50)
+	capacity_title_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	capacity_title_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	capacity_title_label.add_theme_constant_override("outline_size", 10)
+	capacity_bar_container.add_child(capacity_title_label)
 
 	# Style the progress bar
 	var progress_bg = StyleBoxFlat.new()
