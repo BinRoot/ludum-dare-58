@@ -445,7 +445,6 @@ func _animate_camera_to_tile(tile: Node3D, fish: Node3D):
 	# Create the tween for camera animation
 	camera_tween = create_tween()
 	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
-	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
@@ -501,7 +500,6 @@ func _animate_camera_to_tank_area(fish: Node3D):
 	# Create the tween for camera animation
 	camera_tween = create_tween()
 	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
-	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously

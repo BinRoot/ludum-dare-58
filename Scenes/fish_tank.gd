@@ -788,7 +788,6 @@ func _animate_fish_arc_to_tank(fish: Node3D):
 	# Create a custom tween for the parabolic arc
 	var arc_tween = create_tween()
 	arc_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
-	arc_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
 	arc_tween.set_ease(Tween.EASE_IN_OUT)
 	arc_tween.set_trans(Tween.TRANS_SINE)
 
