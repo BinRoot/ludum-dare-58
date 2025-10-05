@@ -260,7 +260,7 @@ func _create_sell_marker():
 
 	# Floating label above the marker
 	sell_label = Label3D.new()
-	sell_label.text = "Sell Here"
+	sell_label.text = "Sell\nHere"
 	sell_label.font_size = 32
 	sell_label.modulate = Color(1.0, 0.95, 0.5)
 	sell_label.outline_modulate = Color.BLACK

@@ -18,6 +18,7 @@ var original_camera_transform: Transform3D
 var camera_tween: Tween = null
 var fish_rotation_tween: Tween = null
 var is_growth_sequence_active: bool = false
+var fish_spotlight: SpotLight3D = null  # Spotlight for fish showcase
 
 func _ready():
 	# Allow the world to process even when paused (for camera animations)
@@ -164,6 +165,9 @@ func _on_fish_placed_in_tank():
 	if fish_rotation_tween and fish_rotation_tween.is_running():
 		fish_rotation_tween.kill()
 
+	# Remove the spotlight
+	_remove_fish_spotlight()
+
 	# Clear the global caught fish list (fish has been processed)
 	Global.globally_caught_fish.clear()
 
@@ -289,9 +293,48 @@ func _animate_camera_to_tank_area(fish: Node3D):
 			# Create the basis and apply to the fish
 			fish.global_transform.basis = Basis(fish_forward, fish_up, fish_right)
 
+			# Create and position spotlight to illuminate the fish
+			_create_fish_spotlight(camera, fish)
+
 			# Animate the fish rotating 360 degrees to showcase it
 			_rotate_fish_360(fish)
 	)
+
+# Create and position a spotlight to illuminate the fish
+func _create_fish_spotlight(camera: Camera3D, fish: Node3D):
+	# Remove any existing spotlight
+	_remove_fish_spotlight()
+
+	# Create a new spotlight
+	fish_spotlight = SpotLight3D.new()
+
+	# Configure spotlight properties BEFORE adding to scene
+	fish_spotlight.light_energy = 16.0  # Increased brightness
+	fish_spotlight.light_color = Color(1.0, 1.0, 0.95)  # Slightly warm white
+	fish_spotlight.spot_range = 4096.0  # How far the light reaches
+	fish_spotlight.spot_angle = 15.0  # Wider cone angle for better coverage
+	fish_spotlight.spot_attenuation = 1.0  # How light fades with distance
+	fish_spotlight.shadow_enabled = true  # Enable shadows for more dramatic effect
+
+	# Add to the scene first
+	add_child(fish_spotlight)
+
+	# NOW position it at the camera location (after being in scene tree)
+	fish_spotlight.global_position = camera.global_position
+
+	# Make the spotlight look at the fish (must be done after adding to scene)
+	fish_spotlight.look_at(fish.global_position, Vector3.UP)
+
+	print("Fish spotlight created at camera position: ", camera.global_position)
+	print("Fish spotlight looking at fish position: ", fish.global_position)
+	print("Distance from spotlight to fish: ", camera.global_position.distance_to(fish.global_position))
+
+# Remove the fish spotlight
+func _remove_fish_spotlight():
+	if fish_spotlight and is_instance_valid(fish_spotlight):
+		fish_spotlight.queue_free()
+		fish_spotlight = null
+		print("Fish spotlight removed")
 
 # Rotate the fish 360 degrees to showcase it
 func _rotate_fish_360(fish: Node3D):
@@ -323,6 +366,9 @@ func _animate_camera_to_original():
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
 		return
+
+	# Remove the spotlight (if still present)
+	_remove_fish_spotlight()
 
 	# Cancel any existing camera animation
 	if camera_tween and camera_tween.is_running():
