@@ -1452,6 +1452,10 @@ func _on_button_pressed() -> void:
 # Grow the fish by mutating its graph
 func grow() -> void:
 	print("Fish growing! Age: ", age)
+
+	# Play grow sound effect
+	Global.play_sfx(Global.SFX.GROW)
+
 	graph = mutate_graph.mutate_one(graph)
 	render_graph()
 	# Re-pick destination after growth to avoid getting stuck

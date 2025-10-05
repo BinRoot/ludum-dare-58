@@ -431,6 +431,9 @@ func _try_buy_tank(row: int, col: int):
 	var spent = Global.spend_clams(tank_cost)
 	print("Spend successful:", spent)
 	if spent:
+		# Play buy sound
+		Global.play_sfx(Global.SFX.SELECT_BUY)
+
 		print("Emitting cell_clicked signal for row:", row, " col:", col)
 		cell_clicked.emit(row, col)
 		print("Signal emitted, new clam balance:", Global.get_clams())

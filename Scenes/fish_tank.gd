@@ -393,6 +393,9 @@ func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _norm
 					_end_drag()
 
 func _place_caught_fish():
+	# Play tank selection sound
+	Global.play_sfx(Global.SFX.SELECT_TANK_FOR_FISH)
+
 	# Animate the fish with a parabolic arc into this tank
 	var fish = Global.caught_fish
 	if fish:
@@ -414,6 +417,9 @@ func _place_caught_fish():
 
 func _start_drag(mouse_pos: Vector2):
 	is_dragging = true
+
+	# Play tank drag sound
+	Global.play_sfx(Global.SFX.SELECT_WATERY)
 
 	# Calculate offset between mouse position and tank center
 	var camera = get_viewport().get_camera_3d()
@@ -671,6 +677,9 @@ func _sell_this_tank():
 	# Calculate value and award clams
 	var value := Global.compute_tank_sell_value(contained_fish, self)
 	Global.add_clams(value)
+
+	# Play coin sound
+	Global.play_sfx(Global.SFX.COIN_WATERY)
 
 	# Check if this is the first tank sold during tutorial
 	if Global.is_tutorial_active and not Global.tutorial_first_tank_sold:
@@ -1090,6 +1099,9 @@ func recalculate_capacity():
 # Break the tank when over capacity
 func _break_tank():
 	print("Tank breaking! Over capacity: ", current_capacity, "/", max_capacity)
+
+	# Play overstock sound
+	Global.play_sfx(Global.SFX.TANK_OVERSTOCK)
 
 	# Create breaking visual effect
 	_create_tank_break_effect()

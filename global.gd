@@ -2,6 +2,43 @@ extends Node
 
 var house_cell_size: int = 5
 
+# Audio SFX system
+enum SFX {
+	# just caught a fish
+	CAUGHT_FISH,
+
+	# sold a tank
+	COIN_WATERY,
+
+	# game over
+	GAME_OVER,
+
+	# fish grows/mutates
+	GROW,
+
+	# clicked a sea tile to cast a net
+	NET_CATCH_ATTEMPT,
+
+	# select a tile to buy a tank successfully
+	SELECT_BUY,
+
+	# select a tank for the fish to live in
+	SELECT_TANK_FOR_FISH,
+
+	# select a tank (beginning of the drag an drop action)
+	SELECT_WATERY,
+
+	# play this sound when a tank is overstocked and about to be deleted
+	TANK_OVERSTOCK,
+
+	# play when you win
+	WIN
+}
+
+var sfx: Dictionary = {}
+var sfx_player: AudioStreamPlayer
+var music_player: AudioStreamPlayer = null
+
 # Item definitions
 var net_item: ItemData
 var items: Array[ItemData] = []
@@ -110,6 +147,44 @@ func _calculate_fish_size(fish: Node3D) -> float:
 	return size
 
 func _ready():
+	# Initialize audio system
+	sfx[SFX.CAUGHT_FISH] = preload("res://Audio/sfx_caught_fish.wav")
+	sfx[SFX.COIN_WATERY] = preload("res://Audio/sfx_coin_watery.wav")
+	sfx[SFX.GAME_OVER] = preload("res://Audio/sfx_game_over.wav")
+	sfx[SFX.GROW] = preload("res://Audio/sfx_grow.wav")
+	sfx[SFX.NET_CATCH_ATTEMPT] = preload("res://Audio/sfx_net_catch_attempt.wav")
+	sfx[SFX.SELECT_BUY] = preload("res://Audio/sfx_select_buy.wav")
+	sfx[SFX.SELECT_TANK_FOR_FISH] = preload("res://Audio/sfx_select_tank_for_fish.wav")
+	sfx[SFX.SELECT_WATERY] = preload("res://Audio/sfx_select_watery.wav")
+	sfx[SFX.TANK_OVERSTOCK] = preload("res://Audio/sfx_tank_overstock.wav")
+	sfx[SFX.WIN] = preload("res://Audio/sfx_win.wav")
+
+	# Create AudioStreamPlayer for playing SFX
+	sfx_player = AudioStreamPlayer.new()
+	sfx_player.bus = "Master"
+	add_child(sfx_player)
+
+	# Setup background music
+	music_player = AudioStreamPlayer.new()
+	music_player.bus = "Master"
+	music_player.volume_db = -5.0  # Slightly quieter than SFX
+	music_player.autoplay = true
+	add_child(music_player)
+
+	# Load and play background music (use load() for runtime import)
+	var background_music = load("res://Audio/background.wav")
+	if background_music:
+		music_player.stream = background_music
+		music_player.play()
+		# Connect finished signal to replay for looping
+		music_player.finished.connect(func():
+			if music_player and is_instance_valid(music_player):
+				music_player.play()
+		)
+		print("[Global] Background music started (looping via finished signal)")
+	else:
+		push_warning("Could not load background music")
+
 	# Create the net item
 	net_item = ItemData.new()
 	net_item.id = "net"
@@ -204,6 +279,7 @@ func check_game_over() -> bool:
 		else:
 			# Game over if no tanks and can't afford to buy one
 			is_game_over = true
+			play_sfx(SFX.GAME_OVER)
 			game_over.emit()
 			return true
 	else:
@@ -235,8 +311,29 @@ func check_win_condition() -> bool:
 				# Check if the tank occupies the full grid (5x5)
 				if tank.width == house_cell_size and tank.height == house_cell_size:
 					has_won = true
+					play_sfx(SFX.WIN)
 					game_won.emit()
 					print("WIN CONDITION MET! Tank size: ", tank.width, "x", tank.height)
 					return true
 
 	return false
+
+# Play a sound effect by enum
+func play_sfx(sfx_id: SFX, volume_db: float = 0.0):
+	if sfx.has(sfx_id):
+		# Create a new AudioStreamPlayer for each sound so they can overlap
+		var player = AudioStreamPlayer.new()
+		player.stream = sfx[sfx_id]
+		player.volume_db = volume_db
+		player.bus = "Master"
+		add_child(player)
+		player.play()
+
+		# Auto-cleanup when finished
+		player.finished.connect(func():
+			player.queue_free()
+		)
+
+		print("[Global] Playing SFX: ", sfx_id)
+	else:
+		push_warning("SFX not found: " + str(sfx_id))

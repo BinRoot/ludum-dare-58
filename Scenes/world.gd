@@ -192,6 +192,9 @@ func _zoom_to_catch_then_show_fish(fish: Node3D, tile: Node3D):
 	# Pause the game world immediately
 	get_tree().paused = true
 
+	# Play caught fish sound at the start of celebration
+	Global.play_sfx(Global.SFX.CAUGHT_FISH)
+
 	# Keep the fish visible throughout the entire sequence
 	fish.visible = true
 	fish.is_moving = false
@@ -512,13 +515,10 @@ func _animate_camera_to_tank_area(fish: Node3D):
 		camera_tween.tween_property(fish, "global_position", target_fish_position, 1.0)
 		camera_tween.tween_property(fish, "global_transform:basis", target_fish_basis, 1.0)
 
-	# After animation completes, set up the spotlight and rotation
+	# After animation completes, rotate the fish to showcase it
 	camera_tween.chain()  # End parallel mode
 	camera_tween.tween_callback(func():
-		if camera and fish:
-			# Create and position spotlight to illuminate the fish
-			_create_fish_spotlight(camera, fish)
-
+		if fish:
 			# Animate the fish rotating 360 degrees to showcase it
 			_rotate_fish_360(fish)
 	)

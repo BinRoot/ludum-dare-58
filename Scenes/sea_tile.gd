@@ -102,6 +102,7 @@ func _process(_delta):
 				if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish and not Global.is_selecting_tank and not Global.must_buy_tank:
 					caught_fish.append(fish_ref)
 					Global.globally_caught_fish.append(fish_ref)  # Mark as globally caught immediately
+
 					fish_caught.emit(fish_ref, self)
 					_celebrate_catch()
 
@@ -137,6 +138,9 @@ func start_casting_net():
 		# No net available - find and destroy the oldest net
 		_remove_oldest_net_and_place_here()
 		return
+
+	# Play net casting sound
+	Global.play_sfx(Global.SFX.NET_CATCH_ATTEMPT)
 
 	is_casting_net = true
 	_create_casting_visual()
@@ -392,6 +396,9 @@ func _remove_oldest_net_and_place_here():
 		oldest_tile.consume_net()
 	elif oldest_tile.is_casting_net:
 		oldest_tile.cancel_casting()
+
+	# Play net casting sound
+	Global.play_sfx(Global.SFX.NET_CATCH_ATTEMPT)
 
 	# Now place a new net here at this tile
 	is_casting_net = true
