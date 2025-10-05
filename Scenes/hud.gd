@@ -16,6 +16,8 @@ var win_label: Label = null
 var win_restart_button: Button = null
 var tutorial_panel: Panel = null
 var tutorial_label: Label = null
+var must_buy_tank_panel: Panel = null
+var must_buy_tank_label: Label = null
 
 func _ready():
 	# Allow the HUD to continue processing while the game is paused
@@ -37,6 +39,9 @@ func _ready():
 	# Connect to tutorial signals
 	Global.tutorial_started.connect(_on_tutorial_started)
 	Global.tutorial_completed.connect(_on_tutorial_completed)
+	# Connect to must buy tank signals
+	Global.must_buy_tank_started.connect(_on_must_buy_tank_started)
+	Global.must_buy_tank_ended.connect(_on_must_buy_tank_ended)
 
 	# Create the tank selection label
 	_create_tank_selection_label()
@@ -48,6 +53,8 @@ func _ready():
 	_create_win_screen()
 	# Create the tutorial screen
 	_create_tutorial_screen()
+	# Create the must buy tank screen
+	_create_must_buy_tank_screen()
 
 	# Initial update
 	_on_inventory_changed()
@@ -374,26 +381,27 @@ func _show_combine_buttons():
 			child.visible = true
 			return
 
-func _create_tutorial_screen():
-	# Create a semi-transparent panel for tutorial
-	tutorial_panel = Panel.new()
-	tutorial_panel.anchor_left = 0.0
-	tutorial_panel.anchor_top = 0.0
-	tutorial_panel.anchor_right = 1.0
-	tutorial_panel.anchor_bottom = 1.0
-	tutorial_panel.visible = false
-	tutorial_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Allow clicks to pass through
+# Helper function to create a styled message panel (used for tutorial and must-buy-tank messages)
+func _create_message_panel(panel_name: String, message_text: String) -> Dictionary:
+	# Create container panel (transparent background, full screen)
+	var container_panel = Panel.new()
+	container_panel.name = panel_name
+	container_panel.anchor_left = 0.0
+	container_panel.anchor_top = 0.0
+	container_panel.anchor_right = 1.0
+	container_panel.anchor_bottom = 1.0
+	container_panel.visible = false
+	container_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE  # Allow clicks to pass through
 
-	# Style the panel with semi-transparent background
-	var style_box = StyleBoxFlat.new()
-	style_box.bg_color = Color(0.0, 0.0, 0.0, 0.0)  # Fully transparent background
-	tutorial_panel.add_theme_stylebox_override("panel", style_box)
+	# Style with transparent background
+	var transparent_style = StyleBoxFlat.new()
+	transparent_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	container_panel.add_theme_stylebox_override("panel", transparent_style)
 
-	add_child(tutorial_panel)
+	add_child(container_panel)
 
-	# Create tutorial message box
+	# Create message box (centered, styled)
 	var message_box = Panel.new()
-	message_box.name = "TutorialMessageBox"
 	message_box.anchor_left = 0.5
 	message_box.anchor_top = 0.15
 	message_box.anchor_right = 0.5
@@ -403,8 +411,7 @@ func _create_tutorial_screen():
 	message_box.offset_top = -75
 	message_box.offset_bottom = 50
 
-
-	# Style the message box
+	# Style the message box with golden border and dark background
 	var message_style = StyleBoxFlat.new()
 	message_style.bg_color = Color(0.1, 0.1, 0.15, 0.95)
 	message_style.border_color = Color(0.8, 0.7, 0.3, 1.0)
@@ -415,28 +422,36 @@ func _create_tutorial_screen():
 	message_style.corner_radius_bottom_right = 10
 	message_box.add_theme_stylebox_override("panel", message_style)
 
-	tutorial_panel.add_child(message_box)
+	container_panel.add_child(message_box)
 
-	# Create tutorial label
-	tutorial_label = Label.new()
-	tutorial_label.text = "Sell your collection to buy more tanks."
-	tutorial_label.add_theme_font_size_override("font_size", 28)
-	tutorial_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.9))
-	tutorial_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	tutorial_label.add_theme_constant_override("outline_size", 2)
-	tutorial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tutorial_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	tutorial_label.anchor_left = 0.0
-	tutorial_label.anchor_top = 0.0
-	tutorial_label.anchor_right = 1.0
-	tutorial_label.anchor_bottom = 1.0
-	tutorial_label.offset_left = 20
-	tutorial_label.offset_right = -20
-	tutorial_label.offset_top = 20
-	tutorial_label.offset_bottom = -20
+	# Create label
+	var label = Label.new()
+	label.text = message_text
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.9))
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	label.anchor_left = 0.0
+	label.anchor_top = 0.0
+	label.anchor_right = 1.0
+	label.anchor_bottom = 1.0
+	label.offset_left = 20
+	label.offset_right = -20
+	label.offset_top = 20
+	label.offset_bottom = -20
 
-	message_box.add_child(tutorial_label)
+	message_box.add_child(label)
+
+	# Return both the container panel and label for external reference
+	return {"panel": container_panel, "label": label}
+
+func _create_tutorial_screen():
+	var result = _create_message_panel("TutorialPanel", "Sell your collection to buy more tanks.")
+	tutorial_panel = result["panel"]
+	tutorial_label = result["label"]
 
 func _on_tutorial_started():
 	print("[HUD] Tutorial started - showing tutorial panel")
@@ -453,6 +468,21 @@ func _on_tutorial_completed():
 	# Show inventory after tutorial
 	if inventory_container:
 		inventory_container.visible = true
+
+func _create_must_buy_tank_screen():
+	var result = _create_message_panel("MustBuyTankPanel", "Buy a fish tank!")
+	must_buy_tank_panel = result["panel"]
+	must_buy_tank_label = result["label"]
+
+func _on_must_buy_tank_started():
+	print("[HUD] Must buy tank mode started - showing message")
+	if must_buy_tank_panel:
+		must_buy_tank_panel.visible = true
+
+func _on_must_buy_tank_ended():
+	print("[HUD] Must buy tank mode ended - hiding message")
+	if must_buy_tank_panel:
+		must_buy_tank_panel.visible = false
 
 func _on_inventory_changed():
 	# Update inventory displays for each item type

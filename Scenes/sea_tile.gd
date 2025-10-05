@@ -98,7 +98,8 @@ func _process(_delta):
 				# Check if fish is caught by net
 				# Check both local and global caught lists to prevent double-catching
 				# Also ensure we're not already in the middle of selecting a tank for another fish
-				if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish and not Global.is_selecting_tank:
+				# Don't allow catching fish during "must buy tank" mode
+				if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish and not Global.is_selecting_tank and not Global.must_buy_tank:
 					caught_fish.append(fish_ref)
 					Global.globally_caught_fish.append(fish_ref)  # Mark as globally caught immediately
 					fish_caught.emit(fish_ref, self)
@@ -126,6 +127,11 @@ func _handle_click():
 		start_casting_net()
 
 func start_casting_net():
+	# Don't allow casting during "must buy tank" mode
+	if Global.must_buy_tank:
+		print("[SeaTile] Cannot cast net - must buy tank first")
+		return
+
 	# Check if player has a net available
 	if not Global.use_item("net"):
 		# No net available - find and destroy the oldest net

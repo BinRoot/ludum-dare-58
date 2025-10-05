@@ -51,6 +51,11 @@ var tutorial_first_tank_sold: bool = false
 signal tutorial_started
 signal tutorial_completed
 
+# Must buy tank state
+var must_buy_tank: bool = false
+signal must_buy_tank_started
+signal must_buy_tank_ended
+
 # Utility: compute sell value for a tank given its contained fish and tank reference
 # Rules:
 # 1. More fish = more money
@@ -187,11 +192,26 @@ func check_game_over() -> bool:
 				for child in node.get_children():
 					nodes_to_check.append(child)
 
-	# Game over if no tanks and can't afford to buy one
-	if tank_count == 0 and clams < tank_cost:
-		is_game_over = true
-		game_over.emit()
-		return true
+	# Check if player has no tanks
+	if tank_count == 0:
+		# If they can afford a tank, enter "must buy tank" mode
+		if clams >= tank_cost:
+			if not must_buy_tank:
+				must_buy_tank = true
+				must_buy_tank_started.emit()
+				print("[Global] Must buy tank mode activated")
+			return false
+		else:
+			# Game over if no tanks and can't afford to buy one
+			is_game_over = true
+			game_over.emit()
+			return true
+	else:
+		# Player has tanks, exit "must buy tank" mode if it was active
+		if must_buy_tank:
+			must_buy_tank = false
+			must_buy_tank_ended.emit()
+			print("[Global] Must buy tank mode deactivated")
 
 	return false
 
