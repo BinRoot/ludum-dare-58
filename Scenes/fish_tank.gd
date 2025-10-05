@@ -964,8 +964,12 @@ func _create_capacity_bar():
 	# Add "Capacity" title label (after progress bar so it renders on top)
 	capacity_title_label = Label.new()
 	capacity_title_label.text = "Capacity"
-	capacity_title_label.position = Vector2(35, 25)
-	capacity_title_label.add_theme_font_size_override("font_size", 50)
+	# Load and apply LostFish font
+	var lost_fish_font = load("res://LostFish-5DOz.ttf")
+	if lost_fish_font:
+		capacity_title_label.add_theme_font_override("font", lost_fish_font)
+	capacity_title_label.position = Vector2(35, 40)
+	capacity_title_label.add_theme_font_size_override("font_size", 40)
 	capacity_title_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	capacity_title_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	capacity_title_label.add_theme_constant_override("outline_size", 10)

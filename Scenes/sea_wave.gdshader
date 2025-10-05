@@ -22,16 +22,26 @@ void vertex() {
 	// Get world position
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 
-	// Create multiple wave patterns
+	// Create multiple wave patterns for vertical displacement
 	float wave1 = sin(world_pos.x * wave_frequency + TIME * wave_speed) * wave_height;
 	float wave2 = cos(world_pos.z * wave_frequency * 0.7 + TIME * wave_speed * 1.3) * wave_height * 0.5;
 	float wave3 = sin((world_pos.x + world_pos.z) * wave_frequency * 0.5 + TIME * wave_speed * 0.8) * wave_height * 0.3;
 
-	// Combine waves
+	// Combine waves for vertical motion
 	float total_wave = wave1 + wave2 + wave3;
 
-	// Apply wave to vertex Y position
-	VERTEX.y += total_wave;
+	// Create horizontal wave patterns (left/right motion)
+	float horizontal_wave1 = cos(world_pos.z * wave_frequency * 0.8 + TIME * wave_speed * 0.9) * wave_height * 0.4;
+	float horizontal_wave2 = sin(world_pos.x * wave_frequency * 0.6 + TIME * wave_speed * 1.1) * wave_height * 0.3;
+
+	// Create depth wave patterns (forward/backward motion)
+	float depth_wave1 = sin(world_pos.x * wave_frequency * 0.9 + TIME * wave_speed * 1.2) * wave_height * 0.4;
+	float depth_wave2 = cos(world_pos.z * wave_frequency * 0.5 + TIME * wave_speed * 0.7) * wave_height * 0.3;
+
+	// Apply waves to vertex positions
+	VERTEX.y += total_wave;  // Vertical (up/down)
+	VERTEX.x += horizontal_wave1 + horizontal_wave2;  // Horizontal (left/right)
+	VERTEX.z += depth_wave1 + depth_wave2;  // Depth (forward/backward)
 }
 
 // Calculate distance to nearest hexagon edge

@@ -20,12 +20,18 @@ var fish_rotation_tween: Tween = null
 var is_growth_sequence_active: bool = false
 var fish_spotlight: SpotLight3D = null  # Spotlight for fish showcase
 
+# Water mesh reference
+var water_mesh: MeshInstance3D = null
+
 func _ready():
 	# Allow the world to process even when paused (for camera animations)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	generate_hex_grid()
 	update_fish_references()
+
+	# Setup water shader
+	_setup_water_shader()
 
 	# Store original camera position for later
 	var camera = get_viewport().get_camera_3d()
@@ -83,7 +89,7 @@ func generate_hex_grid():
 				x += hex_width
 
 			# Center the grid around origin
-			tile.position = Vector3(x - offset_x, 0, z - offset_z) - Vector3(30, 0, 5)
+			tile.position = Vector3(x - offset_x, 0.5, z - offset_z) - Vector3(30, 0, 5)
 			add_child(tile)
 			sea_tiles.append(tile)
 
@@ -112,6 +118,46 @@ func _find_fish_recursive(node: Node, fish_list: Array[Node3D]):
 	# Check all children
 	for child in node.get_children():
 		_find_fish_recursive(child, fish_list)
+
+# Setup the water shader for beach-like waves
+func _setup_water_shader():
+	# Find the water mesh in the scene (it's under Pond/CollisionShape3D/Water)
+	var pond = get_node_or_null("Pond")
+	if pond:
+		var collision_shape = pond.get_node_or_null("CollisionShape3D")
+		if collision_shape:
+			water_mesh = collision_shape.get_node_or_null("Water")
+			if water_mesh and water_mesh is MeshInstance3D:
+				# Increase subdivisions for the water plane so waves are visible
+				if water_mesh.mesh is PlaneMesh:
+					var plane_mesh = water_mesh.mesh as PlaneMesh
+					plane_mesh.subdivide_width = 50  # More subdivisions for smoother waves
+					plane_mesh.subdivide_depth = 100  # More in the depth direction
+					print("[World] Water plane subdivisions set to 50x100")
+
+				# Load the sea wave shader
+				var wave_shader = load("res://Scenes/sea_wave.gdshader")
+				if wave_shader:
+					# Create shader material
+					var shader_material = ShaderMaterial.new()
+					shader_material.shader = wave_shader
+
+					# Set shader parameters for beach-like waves
+					shader_material.set_shader_parameter("wave_speed", 1.2)
+					shader_material.set_shader_parameter("wave_height", 0.15)
+					shader_material.set_shader_parameter("wave_frequency", 3.0)
+					shader_material.set_shader_parameter("wave_direction", Vector3(1.0, 0.0, 0.5))
+					shader_material.set_shader_parameter("water_color", Color(0.07, 0.14, 0.47, 1.0))
+					shader_material.set_shader_parameter("roughness", 0.3)
+
+					# Apply the shader material to the water mesh
+					water_mesh.material_override = shader_material
+
+					print("[World] Water shader applied to pond mesh")
+				else:
+					push_warning("Could not load sea wave shader")
+			else:
+				push_warning("Water mesh not found under Pond/CollisionShape3D")
 
 func _on_fish_caught(fish: Node3D, tile: Node3D):
 	# Prevent catching multiple fish simultaneously - ignore if already processing a catch
@@ -349,7 +395,7 @@ func _set_camera_to_tutorial_view():
 		if not sell_bounds.is_empty():
 			var sell_pos = sell_bounds["position"] as Vector3
 			# Find midpoint between tank area and sell zone
-			target_position = tank_area.global_position * 0.55 + sell_pos * 0.45
+			target_position = tank_area.global_position * 0.5 + sell_pos * 0.5
 
 	# Camera position: above and slightly back from the target
 	var camera_offset = Vector3(0, 9, 1)
@@ -439,7 +485,7 @@ func _animate_camera_to_tank_area(fish: Node3D):
 
 	# Calculate where the fish should end up
 	var target_fish_position = target_camera_position + camera_forward * 5.0
-	target_fish_position += camera_up * 2  # Move up
+	target_fish_position += camera_up * 0  # Move up
 	target_fish_position -= camera_right * 3.5  # Move left
 
 	# Calculate target fish rotation (facing camera)

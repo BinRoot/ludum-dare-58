@@ -5,6 +5,7 @@ var inventory_item_scene: PackedScene = preload("res://Scenes/InventoryItem.tscn
 var inventory_items: Dictionary = {}  # item_id -> Array of InventoryItem nodes
 
 var tank_selection_label: Label = null
+var tank_selection_panel: Panel = null
 var clams_container: HBoxContainer = null
 var clams_icon: TextureRect = null
 var clams_label: Label = null
@@ -61,28 +62,14 @@ func _ready():
 	_on_clams_changed()
 
 func _create_tank_selection_label():
-	tank_selection_label = Label.new()
-	tank_selection_label.text = "Give your fish a home!"
-	tank_selection_label.add_theme_font_size_override("font_size", 24)
-	tank_selection_label.add_theme_color_override("font_color", Color.YELLOW)
-	tank_selection_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	tank_selection_label.add_theme_constant_override("outline_size", 4)
-	tank_selection_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tank_selection_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	tank_selection_label.anchor_left = 0.5
-	tank_selection_label.anchor_right = 0.5
-	tank_selection_label.anchor_top = 0.1
-	tank_selection_label.anchor_bottom = 0.1
-	tank_selection_label.offset_left = -300
-	tank_selection_label.offset_right = 300
-	tank_selection_label.offset_top = -20
-	tank_selection_label.offset_bottom = 20
-	tank_selection_label.visible = false
-	add_child(tank_selection_label)
+	# Reuse the message panel UI for consistency
+	var result = _create_message_panel("TankSelectionPanel", "Pick a home")
+	tank_selection_panel = result["panel"]
+	tank_selection_label = result["label"]
 
 func _on_tank_selection_started():
-	if tank_selection_label:
-		tank_selection_label.visible = true
+	if tank_selection_panel:
+		tank_selection_panel.visible = true
 	# Hide the inventory container during tank selection
 	if inventory_container:
 		inventory_container.visible = false
@@ -93,8 +80,8 @@ func _on_tank_selection_started():
 	_hide_combine_buttons()
 
 func _on_fish_placed():
-	if tank_selection_label:
-		tank_selection_label.visible = false
+	if tank_selection_panel:
+		tank_selection_panel.visible = false
 	# Show the inventory container again after placing the fish
 	if inventory_container:
 		inventory_container.visible = true

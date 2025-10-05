@@ -291,6 +291,10 @@ func _create_sell_marker():
 	# Floating label above the marker
 	sell_label = Label3D.new()
 	sell_label.text = "Sell\nHere"
+	# Load and apply LostFish font
+	var lost_fish_font = load("res://LostFish-5DOz.ttf")
+	if lost_fish_font:
+		sell_label.font = lost_fish_font
 	sell_label.font_size = 32
 	sell_label.modulate = Color(1.0, 0.95, 0.5)
 	sell_label.outline_modulate = Color.BLACK

@@ -13,6 +13,7 @@ config_version=5
 config/name="ludum-dare-58"
 run/main_scene="uid://bny86q764j0b2"
 config/features=PackedStringArray("4.5", "GL Compatibility")
+boot_splash/bg_color=Color(0.43701634, 0.72000015, 0.89809597, 1)
 config/icon="res://icon.svg"
 
 [autoload]

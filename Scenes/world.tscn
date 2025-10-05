@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=14 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://fmoiqtua5rsi" path="res://Scenes/fish.tscn" id="3_5a7ea"]
@@ -13,10 +13,10 @@ albedo_color = Color(0.049582362, 0.18022257, 0.35306874, 1)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_5a7ea"]
 material = SubResource("StandardMaterial3D_5a7ea")
-size = Vector2(20, 30)
+size = Vector2(20, 50)
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_8j60k"]
-size = Vector2(50, 50)
+size = Vector2(100, 50)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8j60k"]
 albedo_color = Color(0.78431374, 0.4509804, 0, 1)
@@ -32,6 +32,11 @@ albedo_color = Color(0.10401503, 0.22045144, 0.072277136, 1)
 emission_energy_multiplier = 7.07
 rim = 0.0
 rim_tint = 0.0
+
+[sub_resource type="Environment" id="Environment_8j60k"]
+background_mode = 1
+background_color = Color(0.6651708, 0.84803575, 0.9523416, 1)
+glow_enabled = true
 
 [node name="World" type="Node3D" node_paths=PackedStringArray("pond_bounds", "tank_area")]
 script = ExtResource("1_5a7ea")
@@ -57,6 +62,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -5)
 shape = SubResource("BoxShape3D_5a7ea")
 
 [node name="Water" type="MeshInstance3D" parent="Pond/CollisionShape3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.29242325, 0.33818054, 0)
 mesh = SubResource("PlaneMesh_5a7ea")
 skeleton = NodePath("../..")
 
@@ -71,7 +77,7 @@ visible = false
 bounds_shape = NodePath("../Pond/CollisionShape3D")
 
 [node name="Sand" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, -5)
 mesh = SubResource("PlaneMesh_8j60k")
 surface_material_override/0 = SubResource("StandardMaterial3D_8j60k")
 
@@ -91,3 +97,6 @@ surface_material_override/0 = SubResource("StandardMaterial3D_5ukr8")
 
 [node name="GridVisualizer" parent="." node_paths=PackedStringArray("bounds_shape") instance=ExtResource("6_grid")]
 bounds_shape = NodePath("../Area3D/CollisionShape3D")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_8j60k")
