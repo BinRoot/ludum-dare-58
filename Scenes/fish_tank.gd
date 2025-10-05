@@ -40,6 +40,7 @@ var contained_fish: Array[Node3D] = []
 var current_capacity: float = 0.0  # Current capacity based on fish volumes
 var capacity_bar: ProgressBar = null  # UI progress bar for capacity
 var capacity_bar_container: Control = null  # Container for the progress bar
+var capacity_bar_sprite: Sprite3D = null  # 3D sprite displaying the capacity bar
 
 # Combine button system
 var combine_buttons: Dictionary = {}  # Maps adjacent tank to button node
@@ -139,12 +140,18 @@ func _create_tank_visual():
 	material.albedo_color = glass_color
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.metallic = 0.3
-	material.roughness = 0.1
+	material.metallic = 0.0  # Disabled to prevent reflecting UI elements
+	material.roughness = 1.0  # Maximum roughness - completely matte
+	material.metallic_specular = 0.0  # Disable specular reflections
+	material.disable_ambient_light = false
+	material.disable_receive_shadows = true  # Don't receive shadows (reduces artifacts)
 	mesh_instance.set_surface_override_material(0, material)
 
 	# Set render priority - render glass after water (higher number = rendered later)
 	mesh_instance.sorting_offset = 1.0
+
+	# Set render layers to only 3D layer (not UI)
+	mesh_instance.layers = 1
 
 	# Position the mesh so bottom is at y=0
 	mesh_instance.position.y = tank_height / 2.0
@@ -235,15 +242,21 @@ func _create_water():
 	water_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	water_material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Render both sides
 	water_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS  # Always draw depth
-	water_material.metallic = 0.1
-	water_material.roughness = 0.2
-	water_material.rim_enabled = true
-	water_material.rim = 0.3
-	water_material.rim_tint = 0.5
+	water_material.metallic = 0.0  # Disabled to prevent reflecting UI elements
+	water_material.roughness = 1.0  # Maximum roughness - completely matte
+	water_material.metallic_specular = 0.0  # Disable specular reflections
+	water_material.disable_ambient_light = false
+	water_material.disable_receive_shadows = true  # Don't receive shadows (reduces artifacts)
+	water_material.rim_enabled = false  # Disable rim lighting
+	water_material.rim = 0.0
+	water_material.rim_tint = 0.0
 	water_mesh_instance.set_surface_override_material(0, water_material)
 
 	# Set render priority - render water before glass (lower number = rendered first)
 	water_mesh_instance.sorting_offset = -1.0
+
+	# Set render layers to only 3D layer (not UI)
+	water_mesh_instance.layers = 1
 
 	# Position water so its bottom is at y=0
 	# Center of water box should be at water_height / 2.0
@@ -322,9 +335,9 @@ func _update_hover_effect():
 		else:
 			material.albedo_color = glass_color
 
-	# Show/hide capacity bar based on hover state
-	if capacity_bar_container:
-		capacity_bar_container.visible = is_hovered and not is_dragging and current_capacity > 0
+	# Show/hide capacity bar sprite based on hover state
+	if capacity_bar_sprite:
+		capacity_bar_sprite.visible = is_hovered and not is_dragging and current_capacity > 0
 
 func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int):
 	if event is InputEventMouseButton:
@@ -747,18 +760,20 @@ func _create_capacity_bar():
 	capacity_bar.set_meta("label", label)
 
 	# Create a Sprite3D to display the viewport in 3D
-	var sprite = Sprite3D.new()
-	sprite.texture = viewport.get_texture()
-	sprite.pixel_size = 0.01  # Increased from 0.003 to make it much larger
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sprite.no_depth_test = true
-	sprite.render_priority = 10
+	capacity_bar_sprite = Sprite3D.new()
+	capacity_bar_sprite.texture = viewport.get_texture()
+	capacity_bar_sprite.pixel_size = 0.01  # Increased from 0.003 to make it much larger
+	capacity_bar_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	capacity_bar_sprite.no_depth_test = false
+	capacity_bar_sprite.render_priority = 10
 	# Position above the tank
-	sprite.position = Vector3(0, tank_height + 0.5, -2.5)  # Raised higher too
-	add_child(sprite)
+	capacity_bar_sprite.position = Vector3(0, tank_height + 0.5, -2.5)  # Raised higher too
+	# Set to different render layer to prevent tank reflections
+	capacity_bar_sprite.layers = 2  # Layer 2 for UI elements (tank is on layer 1)
+	add_child(capacity_bar_sprite)
 
 	# Hide initially (show only on hover)
-	capacity_bar_container.visible = false
+	capacity_bar_sprite.visible = false
 
 # Calculate fish volume based on graph complexity
 func _calculate_fish_volume(fish: Node3D) -> float:
@@ -792,10 +807,7 @@ func _update_capacity_bar():
 	var percentage = (current_capacity / max_capacity) * 100.0
 	capacity_bar.value = percentage
 
-	# Update label
-	var label = capacity_bar.get_meta("label") as Label
-	if label:
-		label.text = "Capacity: %d%%" % int(percentage)
+
 
 	# Change color based on capacity level
 	var progress_fill = capacity_bar.get_theme_stylebox("fill") as StyleBoxFlat

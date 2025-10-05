@@ -5,6 +5,8 @@ var inventory_item_scene: PackedScene = preload("res://Scenes/InventoryItem.tscn
 var inventory_items: Dictionary = {}  # item_id -> Array of InventoryItem nodes
 
 var tank_selection_label: Label = null
+var clams_container: HBoxContainer = null
+var clams_icon: TextureRect = null
 var clams_label: Label = null
 var game_over_panel: Panel = null
 var game_over_label: Label = null
@@ -63,6 +65,9 @@ func _on_tank_selection_started():
 	# Hide the inventory container during tank selection
 	if inventory_container:
 		inventory_container.visible = false
+	# Hide the clams display during tank selection
+	if clams_container:
+		clams_container.visible = false
 
 func _on_fish_placed():
 	if tank_selection_label:
@@ -70,43 +75,58 @@ func _on_fish_placed():
 	# Show the inventory container again after placing the fish
 	if inventory_container:
 		inventory_container.visible = true
+	# Show the clams display again after placing the fish
+	if clams_container:
+		clams_container.visible = true
 
 func _on_growth_sequence_started():
 	# Hide inventory and money during growth sequence
 	if inventory_container:
 		inventory_container.visible = false
-	if clams_label:
-		clams_label.visible = false
+	if clams_container:
+		clams_container.visible = false
 
 func _on_growth_sequence_ended():
 	# Show inventory and money again after growth sequence
 	if inventory_container:
 		inventory_container.visible = true
-	if clams_label:
-		clams_label.visible = true
+	if clams_container:
+		clams_container.visible = true
 
 func _create_clams_label():
+	# Create a container to hold the icon and number
+	clams_container = HBoxContainer.new()
+	clams_container.anchor_left = 1.0
+	clams_container.anchor_right = 1.0
+	clams_container.anchor_top = 0.0
+	clams_container.anchor_bottom = 0.0
+	clams_container.offset_left = -300
+	clams_container.offset_top = 20
+	clams_container.offset_right = -20
+	clams_container.offset_bottom = 70
+	add_child(clams_container)
+
+	# Create the coin icon
+	clams_icon = TextureRect.new()
+	clams_icon.texture = load("res://coin.svg")
+	clams_icon.custom_minimum_size = Vector2(48, 48)
+	clams_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	clams_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	clams_container.add_child(clams_icon)
+
+	# Create the number label
 	clams_label = Label.new()
-	clams_label.text = "Clams: 0"
+	clams_label.text = "0"
 	clams_label.add_theme_font_size_override("font_size", 32)
 	clams_label.add_theme_color_override("font_color", Color.WHITE)
 	clams_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	clams_label.add_theme_constant_override("outline_size", 4)
-	clams_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	clams_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	clams_label.anchor_left = 0.0
-	clams_label.anchor_right = 0.0
-	clams_label.anchor_top = 0.0
-	clams_label.anchor_bottom = 0.0
-	clams_label.offset_left = 20
-	clams_label.offset_top = 20
-	clams_label.offset_right = 300
-	clams_label.offset_bottom = 60
-	add_child(clams_label)
+	clams_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	clams_container.add_child(clams_label)
 
 func _on_clams_changed():
 	if clams_label:
-		clams_label.text = "Clams: " + str(Global.get_clams())
+		clams_label.text = str(Global.get_clams())
 
 func _create_game_over_screen():
 	# Create a semi-transparent dark panel that covers the screen

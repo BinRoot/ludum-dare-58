@@ -12,6 +12,8 @@ size = Vector3(20, 1, 30)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5a7ea"]
 albedo_color = Color(0.049582362, 0.18022257, 0.35306874, 1)
+metallic = 0.0
+roughness = 1.0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_5a7ea"]
 material = SubResource("StandardMaterial3D_5a7ea")
@@ -22,6 +24,8 @@ size = Vector2(50, 50)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8j60k"]
 albedo_color = Color(0.78431374, 0.4509804, 0, 1)
+metallic = 0.0
+roughness = 1.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_8j60k"]
 size = Vector3(20, 1, 20)
@@ -31,10 +35,12 @@ size = Vector2(20, 20)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5ukr8"]
 albedo_color = Color(0.36079627, 0.3173924, 0.11428844, 0.23529412)
-rim_enabled = true
-rim = 0.36
-rim_tint = 0.11
-refraction_enabled = true
+rim_enabled = false
+rim = 0.0
+rim_tint = 0.0
+refraction_enabled = false
+metallic = 0.0
+roughness = 1.0
 
 [node name="World" type="Node3D" node_paths=PackedStringArray("pond_bounds", "tank_area")]
 script = ExtResource("1_5a7ea")
@@ -51,7 +57,7 @@ transform = Transform3D(0.9986295, 0.051956907, -0.006287475, 0, 0.120136805, 0.
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-0.6242157, 0.77810675, -0.070034094, 0.028063513, 0.11191788, 0.99332124, 0.7807478, 0.61808133, -0.09169731, 11.046999, 14.151663, 6.8496704)
 light_energy = 1.311
-light_specular = 1.428
+light_specular = 0.0
 
 [node name="Pond" type="Area3D" parent="."]
 collision_layer = 8

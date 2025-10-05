@@ -15,6 +15,7 @@ var boundary_origin: Vector3 = Vector3.ZERO
 var interaction_area: Area3D
 var hovered_cell: Vector2i = Vector2i(-1, -1)
 var cost_label: Label3D = null
+var cost_icon: Sprite3D = null
 var is_mouse_over_grid: bool = false
 
 # Sell tile visuals
@@ -177,17 +178,39 @@ func _setup_interaction():
 	print("Grid interaction setup - Area3D at:", interaction_area.global_position, " collision size:", shape.size)
 
 func _create_cost_label():
+	# Create coin icon (Sprite3D)
+	cost_icon = Sprite3D.new()
+	cost_icon.texture = load("res://coin.svg")
+	cost_icon.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	cost_icon.pixel_size = 0.005  # Smaller pixel size for proper icon size
+	cost_icon.no_depth_test = false
+	cost_icon.render_priority = 10
+	cost_icon.visible = false
+	cost_icon.shaded = false  # Disable shading
+	cost_icon.double_sided = true  # Render from both sides
+	cost_icon.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED  # Ensure proper alpha blending
+	# Place on a separate visibility layer to avoid interaction with tank visuals
+	cost_icon.layers = 2
+	# Texture rect dimensions will be used directly with pixel_size scaling
+	add_child(cost_icon)
+
+	# Create cost label (just the number)
 	cost_label = Label3D.new()
-	cost_label.text = "Cost: " + str(tank_cost) + " clams"
-	cost_label.font_size = 32
+	cost_label.text = str(tank_cost)
+	cost_label.font_size = 48  # Larger font for better visibility
 	cost_label.modulate = Color.YELLOW
 	cost_label.outline_modulate = Color.BLACK
-	cost_label.outline_size = 4
+	cost_label.outline_size = 8
 	cost_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	cost_label.visible = false
-	cost_label.pixel_size = 0.03  # Larger = more visible (was 0.01, now 0.005 which counterintuitively makes it bigger)
-	cost_label.no_depth_test = true  # Always render on top
-	cost_label.render_priority = 10  # Render after other objects
+	cost_label.pixel_size = 0.035  # Larger pixel size so text is visible
+	cost_label.no_depth_test = false
+	cost_label.render_priority = 11  # Higher priority than icon so it renders on top
+	cost_label.shaded = false  # Disable shading to prevent clipping issues
+	cost_label.double_sided = true  # Render from both sides
+	cost_label.alpha_cut = Label3D.ALPHA_CUT_DISABLED  # Ensure proper alpha blending
+	# Place on a separate visibility layer to avoid interaction with tank visuals
+	cost_label.layers = 2
 	add_child(cost_label)
 	print("Cost label created at grid position: ", global_position)
 
@@ -243,6 +266,8 @@ func _on_mouse_exited():
 	hovered_cell = Vector2i(-1, -1)
 	if cost_label:
 		cost_label.visible = false
+	if cost_icon:
+		cost_icon.visible = false
 
 func _on_input_event(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _shape_idx: int):
 	print("_on_input_event called, event type:", event.get_class())
@@ -351,18 +376,24 @@ func _process(_delta):
 	if Global.is_selecting_tank:
 		if cost_label:
 			cost_label.visible = false
+		if cost_icon:
+			cost_icon.visible = false
 		return
 
 	# Don't show cost label during growth sequence
 	if Global.is_growth_sequence_active:
 		if cost_label:
 			cost_label.visible = false
+		if cost_icon:
+			cost_icon.visible = false
 		return
 
 	# Don't show cost label when a tank is being dragged
 	if _is_any_tank_dragging():
 		if cost_label:
 			cost_label.visible = false
+		if cost_icon:
+			cost_icon.visible = false
 		return
 
 	# Update hovered cell and cost label position using simple plane intersection
@@ -389,36 +420,48 @@ func _process(_delta):
 		if col >= 0 and col < grid_size and row >= 0 and row < grid_size:
 			hovered_cell = Vector2i(col, row)
 
-			# Update cost label
-			if cost_label:
+			# Update cost label and icon
+			if cost_label and cost_icon:
 				# Position at center of hovered cell, elevated above the ground
 				var cell_center = Vector3(
 					col * cell_size + cell_size / 2.0,
-					2.0,  # Raised higher so it's visible above tanks
+					2.5,  # Raised higher so it's visible above tanks and grid
 					row * cell_size + cell_size / 2.0
 				)
-				cost_label.global_position = global_position + cell_center
+
+				# Position icon to the left and label to the right
+				var icon_offset = Vector3(-1.1, 0.1, 0)  # Icon on the left, slightly elevated
+				var label_offset = Vector3(0.7, 0.1, 0)  # Label further to the right, slightly elevated
+				cost_icon.global_position = global_position + cell_center + icon_offset
+				cost_label.global_position = global_position + cell_center + label_offset
 
 				# Don't show cost label on sell tile or occupied cells
 				if row == Global.sell_tile_row and col == Global.sell_tile_col:
 					cost_label.visible = false
+					cost_icon.visible = false
 				elif not _is_cell_occupied(row, col):
-					cost_label.text = "Cost: " + str(tank_cost) + " clams"
+					cost_label.text = str(tank_cost)
 					if Global.get_clams() >= tank_cost:
 						cost_label.modulate = Color.GREEN
 					else:
 						cost_label.modulate = Color.RED
 					cost_label.visible = true
+					cost_icon.visible = true
 				else:
 					cost_label.visible = false
+					cost_icon.visible = false
 		else:
 			hovered_cell = Vector2i(-1, -1)
 			if cost_label:
 				cost_label.visible = false
+			if cost_icon:
+				cost_icon.visible = false
 	else:
 		hovered_cell = Vector2i(-1, -1)
 		if cost_label:
 			cost_label.visible = false
+		if cost_icon:
+			cost_icon.visible = false
 
 func _unhandled_input(event: InputEvent):
 	# Global click handler so empty cells can be purchased even if Area3D doesn't catch it
@@ -445,6 +488,8 @@ func _on_tank_selection_started():
 		mesh_instance.visible = false
 	if cost_label:
 		cost_label.visible = false
+	if cost_icon:
+		cost_icon.visible = false
 
 func _on_fish_placed():
 	# Show the sell label and grid lines again after placing the fish
@@ -461,6 +506,8 @@ func _on_growth_sequence_started():
 		mesh_instance.visible = false
 	if cost_label:
 		cost_label.visible = false
+	if cost_icon:
+		cost_icon.visible = false
 	if sell_label:
 		sell_label.visible = false
 	if sell_marker:

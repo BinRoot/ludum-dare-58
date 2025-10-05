@@ -107,7 +107,7 @@ func _ready():
 	inventory_changed.emit()
 
 	# Start with 15 clams
-	clams = 15
+	clams = 115
 	clams_changed.emit()
 
 func use_item(item_id: StringName) -> bool:

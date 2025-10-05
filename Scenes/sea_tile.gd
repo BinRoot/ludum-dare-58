@@ -201,8 +201,8 @@ func _create_net_visual():
 
 		# Add UV-based grid pattern
 		net_material.uv1_scale = Vector3(12, 12, 1)  # Repeat texture for grid effect
-		net_material.metallic = 0.3
-		net_material.roughness = 0.8
+		net_material.metallic = 0.0  # Disabled to prevent reflecting UI elements
+		net_material.roughness = 0.9  # Higher roughness to prevent reflections
 
 		# Create a simple procedural net texture with grid pattern
 		var img = Image.create(16, 16, false, Image.FORMAT_RGBA8)
