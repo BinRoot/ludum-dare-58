@@ -245,7 +245,7 @@ func _show_fish_for_tank_selection(fish: Node3D):
 	fish.is_moving = false
 
 	# Animate camera to tank area (this will also animate the fish)
-	_animate_camera_to_tank_area(fish)
+	await _animate_camera_to_tank_area(fish)
 
 # Called when a fish is placed in a tank - spawn a new one
 func _on_fish_placed_in_tank():
@@ -444,7 +444,7 @@ func _animate_camera_to_tile(tile: Node3D, fish: Node3D):
 
 	# Create the tween for camera animation
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
@@ -499,7 +499,7 @@ func _animate_camera_to_tank_area(fish: Node3D):
 
 	# Create the tween for camera animation
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
@@ -568,7 +568,7 @@ func _rotate_fish_360(fish: Node3D):
 
 	# Create a tween to rotate the fish
 	fish_rotation_tween = create_tween()
-	fish_rotation_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	fish_rotation_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	fish_rotation_tween.set_ease(Tween.EASE_IN_OUT)
 	fish_rotation_tween.set_trans(Tween.TRANS_SINE)
 
@@ -596,7 +596,7 @@ func _animate_camera_to_original():
 
 	# Create the tween for camera animation back
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
@@ -726,7 +726,7 @@ func _animate_camera_to_fish_and_grow(fish: Node3D) -> void:
 
 	# Create the tween for camera animation to fish
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
