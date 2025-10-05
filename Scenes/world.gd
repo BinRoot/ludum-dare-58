@@ -423,8 +423,16 @@ func _handle_fish_growth_sequence() -> void:
 
 	# Animate camera to each growing fish and grow them
 	if not fish_to_grow.is_empty():
+		# Emit signal to hide UI elements
+		Global.is_growth_sequence_active = true
+		Global.growth_sequence_started.emit()
+
 		for fish in fish_to_grow:
 			await _animate_camera_to_fish_and_grow(fish)
+
+		# Emit signal to show UI elements again
+		Global.is_growth_sequence_active = false
+		Global.growth_sequence_ended.emit()
 
 	is_growth_sequence_active = false
 

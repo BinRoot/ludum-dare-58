@@ -22,6 +22,9 @@ func _ready():
 	Global.clams_changed.connect(_on_clams_changed)
 	# Connect to game over signal
 	Global.game_over.connect(_on_game_over)
+	# Connect to growth sequence signals
+	Global.growth_sequence_started.connect(_on_growth_sequence_started)
+	Global.growth_sequence_ended.connect(_on_growth_sequence_ended)
 
 	# Create the tank selection label
 	_create_tank_selection_label()
@@ -67,6 +70,20 @@ func _on_fish_placed():
 	# Show the inventory container again after placing the fish
 	if inventory_container:
 		inventory_container.visible = true
+
+func _on_growth_sequence_started():
+	# Hide inventory and money during growth sequence
+	if inventory_container:
+		inventory_container.visible = false
+	if clams_label:
+		clams_label.visible = false
+
+func _on_growth_sequence_ended():
+	# Show inventory and money again after growth sequence
+	if inventory_container:
+		inventory_container.visible = true
+	if clams_label:
+		clams_label.visible = true
 
 func _create_clams_label():
 	clams_label = Label.new()

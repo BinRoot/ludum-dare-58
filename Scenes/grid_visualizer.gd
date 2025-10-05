@@ -38,6 +38,9 @@ func _ready():
 	# Connect to tank selection signals to hide/show sell label
 	Global.fish_tank_selection_started.connect(_on_tank_selection_started)
 	Global.fish_placed_in_tank.connect(_on_fish_placed)
+	# Connect to growth sequence signals
+	Global.growth_sequence_started.connect(_on_growth_sequence_started)
+	Global.growth_sequence_ended.connect(_on_growth_sequence_ended)
 
 func _position_at_boundary():
 	# Position the grid at the boundary's location
@@ -350,6 +353,12 @@ func _process(_delta):
 			cost_label.visible = false
 		return
 
+	# Don't show cost label during growth sequence
+	if Global.is_growth_sequence_active:
+		if cost_label:
+			cost_label.visible = false
+		return
+
 	# Don't show cost label when a tank is being dragged
 	if _is_any_tank_dragging():
 		if cost_label:
@@ -445,3 +454,24 @@ func _on_fish_placed():
 		sell_marker.visible = true
 	if mesh_instance:
 		mesh_instance.visible = true
+
+func _on_growth_sequence_started():
+	# Hide all grid elements during growth sequence
+	if mesh_instance:
+		mesh_instance.visible = false
+	if cost_label:
+		cost_label.visible = false
+	if sell_label:
+		sell_label.visible = false
+	if sell_marker:
+		sell_marker.visible = false
+
+func _on_growth_sequence_ended():
+	# Show grid elements again after growth sequence
+	if mesh_instance:
+		mesh_instance.visible = true
+	if sell_label:
+		sell_label.visible = true
+	if sell_marker:
+		sell_marker.visible = true
+	# Note: cost_label visibility is controlled by _process() based on hover state

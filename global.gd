@@ -29,6 +29,11 @@ var is_selecting_tank: bool = false
 signal fish_tank_selection_started
 signal fish_placed_in_tank
 
+# Growth sequence state
+var is_growth_sequence_active: bool = false
+signal growth_sequence_started
+signal growth_sequence_ended
+
 # Global tracking of caught fish to prevent double-catching
 var globally_caught_fish: Array[Node3D] = []
 
