@@ -29,7 +29,8 @@ size = Vector3(20, 1, 20)
 size = Vector2(20, 20)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5ukr8"]
-albedo_color = Color(0.36079627, 0.3173924, 0.11428844, 0.23529412)
+albedo_color = Color(0.10401503, 0.22045144, 0.072277136, 1)
+emission_energy_multiplier = 7.07
 rim = 0.0
 rim_tint = 0.0
 

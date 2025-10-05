@@ -17,11 +17,13 @@ var hovered_cell: Vector2i = Vector2i(-1, -1)
 var cost_label: Label3D = null
 var cost_icon: Sprite3D = null
 var is_mouse_over_grid: bool = false
+var hover_highlight: MeshInstance3D = null  # Visual highlight for hovered cell
 
 # Sell tile visuals (now outside the grid)
 var sell_zone: Area3D = null
 var sell_marker: MeshInstance3D = null
 var sell_label: Label3D = null
+var sell_highlight: MeshInstance3D = null  # Highlight for when dragging tank over sell zone
 
 # Signals
 signal cell_clicked(row: int, col: int)
@@ -35,6 +37,7 @@ func _ready():
 	_create_grid_visual()
 	_setup_interaction()
 	_create_cost_label()
+	_create_hover_highlight()
 	_create_sell_marker()
 
 	# Connect to tank selection signals to hide/show sell label
@@ -215,6 +218,30 @@ func _create_cost_label():
 	add_child(cost_label)
 	print("Cost label created at grid position: ", global_position)
 
+func _create_hover_highlight():
+	# Create a highlighted square mesh to show which cell is being hovered
+	hover_highlight = MeshInstance3D.new()
+
+	# Create a plane mesh the size of one cell
+	var plane = PlaneMesh.new()
+	plane.size = Vector2(cell_size * 0.95, cell_size * 0.95)  # Slightly smaller than cell
+	hover_highlight.mesh = plane
+
+	# Create a bright, semi-transparent material
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.3, 1.0, 0.3, 0.4)  # Bright green with transparency
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	hover_highlight.set_surface_override_material(0, mat)
+
+	# Position slightly above the grid to avoid z-fighting
+	hover_highlight.visible = false
+	hover_highlight.layers = 2  # Same layer as cost label/icon
+	add_child(hover_highlight)
+	print("Hover highlight created")
+
 func _create_sell_marker():
 	# Create sell zone OUTSIDE the grid (to the right side)
 	var sell_zone_size = Vector3(cell_size * 1.5, 0.5, cell_size * 1.5)
@@ -271,6 +298,24 @@ func _create_sell_marker():
 	sell_label.position = Vector3(0, 1.5, 0)  # Relative to sell_zone
 	sell_label.visible = false  # Hidden by default, only show when dragging a tank
 	sell_zone.add_child(sell_label)
+
+	# Create a bright highlight for when tank is dragged over sell zone
+	sell_highlight = MeshInstance3D.new()
+	var highlight_plane = PlaneMesh.new()
+	highlight_plane.size = Vector2(sell_zone_size.x * 0.85, sell_zone_size.z * 0.85)
+	sell_highlight.mesh = highlight_plane
+
+	var highlight_mat = StandardMaterial3D.new()
+	highlight_mat.albedo_color = Color(1.0, 0.2, 0.2, 0.5)  # Bright red for selling
+	highlight_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	highlight_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	highlight_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	highlight_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	sell_highlight.set_surface_override_material(0, highlight_mat)
+
+	sell_highlight.position = Vector3(0, -0.2, 0)  # Slightly above marker
+	sell_highlight.visible = false  # Hidden by default
+	sell_zone.add_child(sell_highlight)
 
 # Helper function to get the sell zone's global bounds
 func get_sell_zone_bounds() -> Dictionary:
@@ -406,6 +451,52 @@ func _is_any_tank_dragging() -> bool:
 					return true
 	return false
 
+func _is_tank_over_sell_zone() -> bool:
+	# Check if any dragging tank is over the sell zone
+	if not sell_zone:
+		return false
+
+	var sell_bounds = get_sell_zone_bounds()
+	if sell_bounds.is_empty():
+		return false
+
+	var sell_pos = sell_bounds["position"] as Vector3
+	var sell_size = sell_bounds["size"] as Vector3
+
+	var fish_tank_script = load("res://Scenes/fish_tank.gd")
+	if fish_tank_script and "all_tanks" in fish_tank_script:
+		var all_tanks = fish_tank_script.all_tanks
+		for tank in all_tanks:
+			if tank and is_instance_valid(tank) and "is_dragging" in tank and tank.is_dragging:
+				# Get tank bounds
+				var tank_pos = tank.global_position
+				var tank_width = tank.width * tank.cell_size if "width" in tank and "cell_size" in tank else 1.0
+				var tank_height = tank.height * tank.cell_size if "height" in tank and "cell_size" in tank else 1.0
+
+				var tank_half_width = tank_width / 2.0
+				var tank_half_height = tank_height / 2.0
+
+				# Calculate overlap
+				var zone_half_x = sell_size.x * 0.5
+				var zone_half_z = sell_size.z * 0.5
+
+				var tank_left = tank_pos.x - tank_half_width
+				var tank_right = tank_pos.x + tank_half_width
+				var tank_top = tank_pos.z - tank_half_height
+				var tank_bottom = tank_pos.z + tank_half_height
+
+				var zone_left = sell_pos.x - zone_half_x
+				var zone_right = sell_pos.x + zone_half_x
+				var zone_top = sell_pos.z - zone_half_z
+				var zone_bottom = sell_pos.z + zone_half_z
+
+				# Check for overlap
+				var separated = tank_left > zone_right or tank_right < zone_left or tank_top > zone_bottom or tank_bottom < zone_top
+				if not separated:
+					return true
+
+	return false
+
 func _process(_delta):
 	# Show sell label only when a tank is being dragged
 	var tank_is_dragging = _is_any_tank_dragging()
@@ -413,6 +504,11 @@ func _process(_delta):
 		sell_label.visible = tank_is_dragging
 	if sell_marker:
 		sell_marker.visible = tank_is_dragging
+
+	# Show sell highlight only when a tank is being dragged over the sell zone
+	var tank_over_sell_zone = _is_tank_over_sell_zone()
+	if sell_highlight:
+		sell_highlight.visible = tank_over_sell_zone
 
 	# Don't show cost label during tank selection mode
 	if Global.is_selecting_tank:
@@ -471,11 +567,20 @@ func _process(_delta):
 					row * cell_size + cell_size / 2.0
 				)
 
-				# Position icon to the left and label to the right
-				var icon_offset = Vector3(-1.1, 0.1, 0)  # Icon on the left, slightly elevated
-				var label_offset = Vector3(0.7, 0.1, 0)  # Label further to the right, slightly elevated
+				# Position icon to the left and label to the right with more spacing
+				var icon_offset = Vector3(-1.3, 0.1, 0)  # Icon on the left, slightly elevated
+				var label_offset = Vector3(1.0, 0.1, 0)  # Label further to the right with more space
 				cost_icon.global_position = global_position + cell_center + icon_offset
 				cost_label.global_position = global_position + cell_center + label_offset
+
+				# Position hover highlight at cell center (on the ground)
+				if hover_highlight:
+					var highlight_pos = Vector3(
+						col * cell_size + cell_size / 2.0,
+						0.05,  # Slightly above ground to avoid z-fighting
+						row * cell_size + cell_size / 2.0
+					)
+					hover_highlight.global_position = global_position + highlight_pos
 
 				# Don't show cost label on occupied cells (no sell tile check needed)
 				if not _is_cell_occupied(row, col):
@@ -486,21 +591,29 @@ func _process(_delta):
 						cost_label.modulate = Color.RED
 					cost_label.visible = true
 					cost_icon.visible = true
+					if hover_highlight:
+						hover_highlight.visible = true
 				else:
 					cost_label.visible = false
 					cost_icon.visible = false
+					if hover_highlight:
+						hover_highlight.visible = false
 		else:
 			hovered_cell = Vector2i(-1, -1)
 			if cost_label:
 				cost_label.visible = false
 			if cost_icon:
 				cost_icon.visible = false
+			if hover_highlight:
+				hover_highlight.visible = false
 	else:
 		hovered_cell = Vector2i(-1, -1)
 		if cost_label:
 			cost_label.visible = false
 		if cost_icon:
 			cost_icon.visible = false
+		if hover_highlight:
+			hover_highlight.visible = false
 
 func _unhandled_input(event: InputEvent):
 	# Global click handler so empty cells can be purchased even if Area3D doesn't catch it
@@ -525,6 +638,8 @@ func _on_tank_selection_started():
 		cost_label.visible = false
 	if cost_icon:
 		cost_icon.visible = false
+	if hover_highlight:
+		hover_highlight.visible = false
 
 func _on_fish_placed():
 	# Show grid lines again after placing the fish (sell label controlled by _process)
@@ -539,6 +654,8 @@ func _on_growth_sequence_started():
 		cost_label.visible = false
 	if cost_icon:
 		cost_icon.visible = false
+	if hover_highlight:
+		hover_highlight.visible = false
 
 func _on_growth_sequence_ended():
 	# Show grid elements again after growth sequence (sell label controlled by _process)
