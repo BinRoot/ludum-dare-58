@@ -410,9 +410,6 @@ func _place_caught_fish():
 		Global.is_selecting_tank = false
 		Global.fish_placed_in_tank.emit()
 
-		# Unpause the game
-		get_tree().paused = false
-
 		print("Fish placed in tank at position: ", position)
 
 func _start_drag(mouse_pos: Vector2):
@@ -787,7 +784,6 @@ func _animate_fish_arc_to_tank(fish: Node3D):
 
 	# Create a custom tween for the parabolic arc
 	var arc_tween = create_tween()
-	arc_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	arc_tween.set_ease(Tween.EASE_IN_OUT)
 	arc_tween.set_trans(Tween.TRANS_SINE)
 

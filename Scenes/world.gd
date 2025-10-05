@@ -189,8 +189,8 @@ func _remove_all_nets_and_return_to_inventory():
 		Global.add_item("net", nets_placed)
 
 func _zoom_to_catch_then_show_fish(fish: Node3D, tile: Node3D):
-	# Pause the game world immediately
-	get_tree().paused = true
+	# Set flag to block input (don't pause the tree - causes tween issues in release builds)
+	Global.is_selecting_tank = true
 
 	# Play caught fish sound at the start of celebration
 	Global.play_sfx(Global.SFX.CAUGHT_FISH)
@@ -226,8 +226,7 @@ func _zoom_to_catch_then_show_fish(fish: Node3D, tile: Node3D):
 	await _animate_camera_to_tile(tile, fish)
 
 	# Wait a moment to appreciate the catch
-	var appreciation_timer = get_tree().create_timer(1.0, true, true)  # process_always=true
-	await appreciation_timer.timeout
+	await get_tree().create_timer(1.0).timeout
 
 	# Now continue with the tank selection
 	_show_fish_for_tank_selection(fish)
@@ -238,14 +237,12 @@ func _show_fish_for_tank_selection(fish: Node3D):
 	Global.is_selecting_tank = true
 	Global.fish_tank_selection_started.emit()
 
-	# Game is already paused and surface behavior already disabled from _zoom_to_catch_then_show_fish
-
 	# Keep the fish visible during the transition
 	fish.visible = true
 	fish.is_moving = false
 
 	# Animate camera to tank area (this will also animate the fish)
-	await _animate_camera_to_tank_area(fish)
+	_animate_camera_to_tank_area(fish)
 
 # Called when a fish is placed in a tank - spawn a new one
 func _on_fish_placed_in_tank():
@@ -444,7 +441,6 @@ func _animate_camera_to_tile(tile: Node3D, fish: Node3D):
 
 	# Create the tween for camera animation
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
@@ -499,7 +495,6 @@ func _animate_camera_to_tank_area(fish: Node3D):
 
 	# Create the tween for camera animation
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
@@ -568,7 +563,6 @@ func _rotate_fish_360(fish: Node3D):
 
 	# Create a tween to rotate the fish
 	fish_rotation_tween = create_tween()
-	fish_rotation_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	fish_rotation_tween.set_ease(Tween.EASE_IN_OUT)
 	fish_rotation_tween.set_trans(Tween.TRANS_SINE)
 
@@ -596,7 +590,6 @@ func _animate_camera_to_original():
 
 	# Create the tween for camera animation back
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)  # Work while paused in web
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
@@ -726,7 +719,6 @@ func _animate_camera_to_fish_and_grow(fish: Node3D) -> void:
 
 	# Create the tween for camera animation to fish
 	camera_tween = create_tween()
-	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_IDLE)
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
@@ -742,6 +734,5 @@ func _animate_camera_to_fish_and_grow(fish: Node3D) -> void:
 	if fish.has_method("grow"):
 		fish.grow()
 
-	# Wait a moment to appreciate the growth (timer works during pause)
-	var growth_timer = get_tree().create_timer(1.0, true, true)  # process_always=true, process_in_physics=true
-	await growth_timer.timeout
+	# Wait a moment to appreciate the growth
+	await get_tree().create_timer(1.0).timeout
