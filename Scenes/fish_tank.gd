@@ -376,9 +376,13 @@ func _on_input_event(_camera: Node, event: InputEvent, _position: Vector3, _norm
 					_end_drag()
 
 func _place_caught_fish():
-	# Place the caught fish in this tank
+	# Animate the fish with a parabolic arc into this tank
 	var fish = Global.caught_fish
 	if fish:
+		# Start the arc animation
+		await _animate_fish_arc_to_tank(fish)
+
+		# Now add the fish to the tank after animation completes
 		add_fish(fish)
 
 		# Clear the global state
@@ -715,6 +719,67 @@ func _rectangles_overlap(rect1: Dictionary, rect2: Dictionary) -> bool:
 		return false
 
 	return true
+
+# Animate fish with a parabolic arc trajectory into the tank
+func _animate_fish_arc_to_tank(fish: Node3D):
+	if not fish:
+		return
+
+	# Get starting position (current fish position)
+	var start_pos = fish.global_position
+
+	# Calculate target position (center of tank at water level)
+	var water_fill_percent = 0.9
+	var water_height = tank_height * water_fill_percent
+	var target_pos = global_position + Vector3(0, water_height * 0.5, 0)
+
+	# Calculate the apex of the arc (peak height)
+	var distance = start_pos.distance_to(target_pos)
+	var arc_height = max(3.0, distance * 0.4)  # Arc height scales with distance
+
+	# Animation duration based on distance
+	var duration = clamp(distance * 0.15, 0.5, 1.5)
+
+	# Create a custom tween for the parabolic arc
+	var arc_tween = create_tween()
+	arc_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	arc_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
+	arc_tween.set_ease(Tween.EASE_IN_OUT)
+	arc_tween.set_trans(Tween.TRANS_SINE)
+
+	# Animate the fish along the parabolic arc
+	arc_tween.tween_method(func(t: float):
+		# t goes from 0 to 1
+		# Linear interpolation for horizontal position
+		var current_pos = start_pos.lerp(target_pos, t)
+
+		# Parabolic curve for vertical position (creates the arc)
+		# y = -4h * (t - 0.5)^2 + h, where h is the apex height
+		var base_y = start_pos.y + (target_pos.y - start_pos.y) * t
+		var arc_offset = -4.0 * arc_height * (t - 0.5) * (t - 0.5) + arc_height
+		current_pos.y = base_y + arc_offset
+
+		fish.global_position = current_pos
+
+		# Rotate fish to face the direction of movement
+		if t < 0.98:  # Don't rotate at the very end
+			var next_t = min(t + 0.05, 1.0)
+			var next_pos = start_pos.lerp(target_pos, next_t)
+			var next_base_y = start_pos.y + (target_pos.y - start_pos.y) * next_t
+			var next_arc_offset = -4.0 * arc_height * (next_t - 0.5) * (next_t - 0.5) + arc_height
+			next_pos.y = next_base_y + next_arc_offset
+
+			var direction = (next_pos - current_pos).normalized()
+			if direction.length_squared() > 0.001:
+				# Make fish face the direction it's moving
+				var fish_forward = direction
+				var fish_right = fish_forward.cross(Vector3.UP).normalized()
+				var fish_up = fish_right.cross(fish_forward).normalized()
+				fish.global_transform.basis = Basis(fish_forward, fish_up, fish_right)
+	, 0.0, 1.0, duration)
+
+	# Wait for the animation to complete
+	await arc_tween.finished
 
 # Add a fish to this tank
 func add_fish(fish: Node3D):

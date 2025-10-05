@@ -109,10 +109,9 @@ func _on_fish_caught(fish: Node3D, tile: Node3D):
 	# Remove all nets from all tiles and return 3 nets to inventory
 	_remove_all_nets_and_return_to_inventory()
 
-
-	# Show the fish close to camera and ask user to select a tank
-	if fish:
-		_show_fish_for_tank_selection(fish)
+	# First, zoom to the tile to appreciate the catch
+	if fish and tile:
+		_zoom_to_catch_then_show_fish(fish, tile)
 
 func _remove_all_nets_and_return_to_inventory():
 	# Count how many nets are actually placed and remove them
@@ -129,32 +128,60 @@ func _remove_all_nets_and_return_to_inventory():
 	if nets_placed > 0:
 		Global.add_item("net", nets_placed)
 
-func _show_fish_for_tank_selection(fish: Node3D):
-	# Store the caught fish globally
-	Global.caught_fish = fish
-	Global.is_selecting_tank = true
-	Global.fish_tank_selection_started.emit()
-
-	# Pause the game world
+func _zoom_to_catch_then_show_fish(fish: Node3D, tile: Node3D):
+	# Pause the game world immediately
 	get_tree().paused = true
 
-	# Completely disable surface behavior to prevent flickering
-	if "is_surfacing" in fish:
-		fish.is_surfacing = false
-	if "surface_timer" in fish:
-		fish.surface_timer = 0.0
-	if "next_surface_time" in fish:
-		fish.next_surface_time = 999999.0  # Set to very high value to prevent surfacing
-
-	# Make the fish visible but hide it temporarily during camera transition
-	fish.visible = false
+	# Keep the fish visible throughout the entire sequence
+	fish.visible = true
 	fish.is_moving = false
 
 	# Stop the fish from moving around
 	if fish.has_method("set_movement_enabled"):
 		fish.set_movement_enabled(false)
 
-	# Animate camera to tank area
+	# Disable automatic surface behavior to prevent the fish from auto-submerging
+	if "is_surfacing" in fish:
+		fish.is_surfacing = false
+	if "surface_timer" in fish:
+		fish.surface_timer = 0.0
+	if "next_surface_time" in fish:
+		fish.next_surface_time = 999999.0  # Set to very high value to prevent auto-surfacing
+
+	# Snap the fish to the center of the hexagon tile and raise it
+	var tile_center = tile.global_position
+	fish.global_position = Vector3(tile_center.x, tile_center.y + 1.5, tile_center.z)
+
+	# Make the fish pop its head out manually (apply the rotation without the timer logic)
+	# We don't call _surface() because it would reset timers and trigger auto-submerge
+	if "surface_look_angle" in fish:
+		var current_basis: Basis = fish.global_transform.basis
+		var look_up_rotation: Basis = Basis(Vector3.FORWARD, deg_to_rad(-fish.surface_look_angle))
+		fish.global_transform.basis = current_basis * look_up_rotation
+
+	# First, animate camera to the tile to appreciate the catch
+	await _animate_camera_to_tile(tile, fish)
+
+	# Wait a moment to appreciate the catch
+	var appreciation_timer = get_tree().create_timer(1.0, true, true)  # process_always=true
+	await appreciation_timer.timeout
+
+	# Now continue with the tank selection
+	_show_fish_for_tank_selection(fish)
+
+func _show_fish_for_tank_selection(fish: Node3D):
+	# Store the caught fish globally
+	Global.caught_fish = fish
+	Global.is_selecting_tank = true
+	Global.fish_tank_selection_started.emit()
+
+	# Game is already paused and surface behavior already disabled from _zoom_to_catch_then_show_fish
+
+	# Keep the fish visible during the transition
+	fish.visible = true
+	fish.is_moving = false
+
+	# Animate camera to tank area (this will also animate the fish)
 	_animate_camera_to_tank_area(fish)
 
 # Called when a fish is placed in a tank - spawn a new one
@@ -224,6 +251,47 @@ func _get_random_pond_position() -> Vector3:
 	# Default fallback
 	return pond_bounds.global_position
 
+# Animate camera to zoom to the tile where fish was caught
+func _animate_camera_to_tile(tile: Node3D, fish: Node3D):
+	var camera = get_viewport().get_camera_3d()
+	if not camera or not tile:
+		push_warning("Camera or tile not found!")
+		return
+
+	# Cancel any existing camera animation
+	if camera_tween and camera_tween.is_running():
+		camera_tween.kill()
+
+	# Get the tile's position
+	var tile_position = tile.global_position
+
+	# Calculate a dramatic close-up viewing position
+	# Position camera close and slightly above the tile, looking down at an angle
+	var camera_offset = Vector3(2, 3, 2)  # Close, above, and to the side
+	var target_camera_position = tile_position + camera_offset
+
+	# Calculate the target rotation (basis) for looking at the fish/tile
+	var look_at_position = fish.global_position if fish else tile_position
+	var direction = (look_at_position - target_camera_position).normalized()
+	var right = direction.cross(Vector3.UP).normalized()
+	var up = right.cross(direction).normalized()
+	var target_basis = Basis(right, up, -direction)  # -direction because camera looks down -Z
+
+	# Create the tween for camera animation
+	camera_tween = create_tween()
+	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
+	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
+	camera_tween.set_ease(Tween.EASE_IN_OUT)
+	camera_tween.set_trans(Tween.TRANS_CUBIC)
+	camera_tween.set_parallel(true)  # Animate position and rotation simultaneously
+
+	# Animate camera to the tile
+	camera_tween.tween_property(camera, "global_position", target_camera_position, 0.8)
+	camera_tween.tween_property(camera, "global_transform:basis", target_basis, 0.8)
+
+	# Wait for animation to complete
+	await camera_tween.finished
+
 # Animate camera to look at the tank area
 func _animate_camera_to_tank_area(fish: Node3D):
 	var camera = get_viewport().get_camera_3d()
@@ -248,6 +316,23 @@ func _animate_camera_to_tank_area(fish: Node3D):
 	var up = right.cross(direction).normalized()
 	var target_basis = Basis(right, up, -direction)  # -direction because camera looks down -Z
 
+	# Calculate target fish position and rotation (before camera moves)
+	var camera_forward = -target_basis.z
+	var camera_right = target_basis.x
+	var camera_up = target_basis.y
+
+	# Calculate where the fish should end up
+	var target_fish_position = target_camera_position + camera_forward * 5.0
+	target_fish_position += camera_up * 2  # Move up
+	target_fish_position -= camera_right * 3.5  # Move left
+
+	# Calculate target fish rotation (facing camera)
+	var direction_to_camera = (target_camera_position - target_fish_position).normalized()
+	var fish_forward = direction_to_camera
+	var fish_right = fish_forward.cross(Vector3.UP).normalized()
+	var fish_up = fish_right.cross(fish_forward).normalized()
+	var target_fish_basis = Basis(fish_forward, fish_up, fish_right)
+
 	# Create the tween for camera animation
 	camera_tween = create_tween()
 	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
@@ -260,39 +345,15 @@ func _animate_camera_to_tank_area(fish: Node3D):
 	camera_tween.tween_property(camera, "global_position", target_camera_position, 1.0)
 	camera_tween.tween_property(camera, "global_transform:basis", target_basis, 1.0)
 
-	# After animation completes, show the fish
+	# Animate fish position and rotation in parallel with camera
+	if fish:
+		camera_tween.tween_property(fish, "global_position", target_fish_position, 1.0)
+		camera_tween.tween_property(fish, "global_transform:basis", target_fish_basis, 1.0)
+
+	# After animation completes, set up the spotlight and rotation
 	camera_tween.chain()  # End parallel mode
 	camera_tween.tween_callback(func():
 		if camera and fish:
-			# Show the fish in front of the camera after transition
-			var camera_forward = -camera.global_transform.basis.z
-			var camera_right = camera.global_transform.basis.x
-			var camera_up = camera.global_transform.basis.y
-
-			# Position fish in front, offset to top left
-			var fish_position = camera.global_position + camera_forward * 5.0
-			fish_position += camera_up * 2  # Move up
-			fish_position -= camera_right * 3.5  # Move left
-
-			fish.global_position = fish_position
-			fish.visible = true
-
-			# Make the fish face the camera directly
-			# Since the fish mesh is oriented along X-axis after rotation (from fish.gd line 360),
-			# we need to point the X-axis toward the camera
-			var direction_to_camera = (camera.global_position - fish.global_position).normalized()
-
-			# Calculate the basis for the fish to face the camera
-			# X-axis (fish forward) points toward camera
-			var fish_forward = direction_to_camera
-			# Keep the fish upright (Y should roughly align with world up)
-			var fish_right = fish_forward.cross(Vector3.UP).normalized()
-			# Recalculate up to ensure orthogonality
-			var fish_up = fish_right.cross(fish_forward).normalized()
-
-			# Create the basis and apply to the fish
-			fish.global_transform.basis = Basis(fish_forward, fish_up, fish_right)
-
 			# Create and position spotlight to illuminate the fish
 			_create_fish_spotlight(camera, fish)
 
