@@ -146,6 +146,10 @@ func _create_clams_label():
 	# Create the number label
 	clams_label = Label.new()
 	clams_label.text = "0"
+	# Load and apply Modak font for numbers
+	var modak_font = load("res://Modak-Regular.ttf")
+	if modak_font:
+		clams_label.add_theme_font_override("font", modak_font)
 	clams_label.add_theme_font_size_override("font_size", 32)
 	clams_label.add_theme_color_override("font_color", Color.WHITE)
 	clams_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -175,7 +179,11 @@ func _create_game_over_screen():
 
 	# Create game over label
 	game_over_label = Label.new()
-	game_over_label.text = "GAME OVER\n\nYou're unable to buy any more tanks!"
+	game_over_label.text = "GAME OVER\n\nYou are out of fish tanks!"
+	# Load and apply LostFish font
+	var lost_fish_font = load("res://LostFish-5DOz.ttf")
+	if lost_fish_font:
+		game_over_label.add_theme_font_override("font", lost_fish_font)
 	game_over_label.add_theme_font_size_override("font_size", 48)
 	game_over_label.add_theme_color_override("font_color", Color.RED)
 	game_over_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -192,6 +200,10 @@ func _create_game_over_screen():
 	# Create restart button
 	restart_button = Button.new()
 	restart_button.text = "RESTART"
+	# Load and apply LostFish font
+	var button_font = load("res://LostFish-5DOz.ttf")
+	if button_font:
+		restart_button.add_theme_font_override("font", button_font)
 	restart_button.custom_minimum_size = Vector2(300, 80)
 	restart_button.add_theme_font_size_override("font_size", 36)
 
@@ -260,6 +272,10 @@ func _create_win_screen():
 	# Create win label
 	win_label = Label.new()
 	win_label.text = "CONGRATULATIONS!\n\nYou built the ultimate aquarium!"
+	# Load and apply LostFish font
+	var lost_fish_font = load("res://LostFish-5DOz.ttf")
+	if lost_fish_font:
+		win_label.add_theme_font_override("font", lost_fish_font)
 	win_label.add_theme_font_size_override("font_size", 48)
 	win_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.3, 1.0))  # Bright green
 	win_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -276,6 +292,10 @@ func _create_win_screen():
 	# Create restart button
 	win_restart_button = Button.new()
 	win_restart_button.text = "PLAY AGAIN"
+	# Load and apply LostFish font
+	var button_font = load("res://LostFish-5DOz.ttf")
+	if button_font:
+		win_restart_button.add_theme_font_override("font", button_font)
 	win_restart_button.custom_minimum_size = Vector2(300, 80)
 	win_restart_button.add_theme_font_size_override("font_size", 36)
 
@@ -354,7 +374,7 @@ func _reset_game_state():
 	Global.has_won = false
 
 	# Reset money to starting amount
-	Global.clams = 15
+	Global.clams = 10
 
 	# Reset inventory to starting items
 	Global.inventory.clear()
@@ -364,6 +384,16 @@ func _reset_game_state():
 	Global.caught_fish = null
 	Global.is_selecting_tank = false
 	Global.globally_caught_fish.clear()
+
+	# Reset tutorial state (will restart on next game load)
+	Global.is_tutorial_active = true
+	Global.tutorial_first_tank_sold = false
+
+	# Reset must buy tank state
+	Global.must_buy_tank = false
+
+	# Reset growth sequence state
+	Global.is_growth_sequence_active = false
 
 func _hide_combine_buttons():
 	# Find and hide the CombineButtonLayer
@@ -427,7 +457,11 @@ func _create_message_panel(panel_name: String, message_text: String) -> Dictiona
 	# Create label
 	var label = Label.new()
 	label.text = message_text
-	label.add_theme_font_size_override("font_size", 28)
+	# Load and apply OceanAnimal font for tutorial messages
+	var ocean_font = load("res://OceanAnimal-2vvvX.ttf")
+	if ocean_font:
+		label.add_theme_font_override("font", ocean_font)
+	label.add_theme_font_size_override("font_size", 50)
 	label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.9))
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 2)
@@ -449,7 +483,7 @@ func _create_message_panel(panel_name: String, message_text: String) -> Dictiona
 	return {"panel": container_panel, "label": label}
 
 func _create_tutorial_screen():
-	var result = _create_message_panel("TutorialPanel", "Sell your collection to buy more tanks.")
+	var result = _create_message_panel("TutorialPanel", "Sell your collection")
 	tutorial_panel = result["panel"]
 	tutorial_label = result["label"]
 
@@ -470,7 +504,7 @@ func _on_tutorial_completed():
 		inventory_container.visible = true
 
 func _create_must_buy_tank_screen():
-	var result = _create_message_panel("MustBuyTankPanel", "Buy a fish tank!")
+	var result = _create_message_panel("MustBuyTankPanel", "Buy a fish tank")
 	must_buy_tank_panel = result["panel"]
 	must_buy_tank_label = result["label"]
 

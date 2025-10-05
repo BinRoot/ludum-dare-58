@@ -294,6 +294,10 @@ func _create_sell_preview():
 	# Create text label (larger and more visible)
 	sell_preview_label = Label3D.new()
 	sell_preview_label.text = ""
+	# Load and apply Modak font for numbers
+	var modak_font = load("res://Modak-Regular.ttf")
+	if modak_font:
+		sell_preview_label.font = modak_font
 	sell_preview_label.font_size = 32  # Larger font
 	sell_preview_label.modulate = Color(1.0, 1.0, 0.6)
 	sell_preview_label.outline_modulate = Color.BLACK

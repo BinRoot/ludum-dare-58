@@ -201,6 +201,10 @@ func _create_cost_label():
 	# Create cost label (just the number)
 	cost_label = Label3D.new()
 	cost_label.text = str(tank_cost)
+	# Load and apply Modak font for numbers
+	var modak_font = load("res://Modak-Regular.ttf")
+	if modak_font:
+		cost_label.font = modak_font
 	cost_label.font_size = 48  # Larger font for better visibility
 	cost_label.modulate = Color.YELLOW
 	cost_label.outline_modulate = Color.BLACK
