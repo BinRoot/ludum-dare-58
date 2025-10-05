@@ -1,7 +1,6 @@
-[gd_scene load_steps=15 format=3 uid="uid://bny86q764j0b2"]
+[gd_scene load_steps=14 format=3 uid="uid://bny86q764j0b2"]
 
 [ext_resource type="Script" uid="uid://b5kps4ue5b4hw" path="res://Scenes/world.gd" id="1_5a7ea"]
-[ext_resource type="PackedScene" uid="uid://bj2m6hkljq3ax" path="res://Scenes/player.tscn" id="1_a02cp"]
 [ext_resource type="PackedScene" uid="uid://fmoiqtua5rsi" path="res://Scenes/fish.tscn" id="3_5a7ea"]
 [ext_resource type="PackedScene" uid="uid://dlfuaipowshr3" path="res://Scenes/hud.tscn" id="4_hud"]
 [ext_resource type="PackedScene" uid="uid://clshdani8u3d0" path="res://Scenes/fish_tank.tscn" id="5_fo5ed"]
@@ -12,8 +11,6 @@ size = Vector3(20, 1, 30)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5a7ea"]
 albedo_color = Color(0.049582362, 0.18022257, 0.35306874, 1)
-metallic = 0.0
-roughness = 1.0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_5a7ea"]
 material = SubResource("StandardMaterial3D_5a7ea")
@@ -24,8 +21,6 @@ size = Vector2(50, 50)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8j60k"]
 albedo_color = Color(0.78431374, 0.4509804, 0, 1)
-metallic = 0.0
-roughness = 1.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_8j60k"]
 size = Vector3(20, 1, 20)
@@ -35,24 +30,18 @@ size = Vector2(20, 20)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5ukr8"]
 albedo_color = Color(0.36079627, 0.3173924, 0.11428844, 0.23529412)
-rim_enabled = false
 rim = 0.0
 rim_tint = 0.0
-refraction_enabled = false
-metallic = 0.0
-roughness = 1.0
 
 [node name="World" type="Node3D" node_paths=PackedStringArray("pond_bounds", "tank_area")]
 script = ExtResource("1_5a7ea")
 pond_bounds = NodePath("Pond/CollisionShape3D")
 tank_area = NodePath("Area3D")
 
-[node name="Player" parent="." instance=ExtResource("1_a02cp")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.352211, 0)
-
 [node name="Camera3D" type="Camera3D" parent="."]
 process_mode = 3
-transform = Transform3D(0.9986295, 0.051956907, -0.006287475, 0, 0.120136805, 0.9927573, 0.05233596, -0.9913968, 0.11997216, 0, 19.607, 1)
+transform = Transform3D(0.9986295, 0, -0.05233596, 0.05195691, 0.12013657, 0.99139684, 0.0062874625, -0.9927574, 0.11997192, 0, 21, 0)
+rotation_order = 0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-0.6242157, 0.77810675, -0.070034094, 0.028063513, 0.11191788, 0.99332124, 0.7807478, 0.61808133, -0.09169731, 11.046999, 14.151663, 6.8496704)
