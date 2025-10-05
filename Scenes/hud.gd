@@ -75,6 +75,8 @@ func _on_tank_selection_started():
 	# Hide the clams display during tank selection
 	if clams_container:
 		clams_container.visible = false
+	# Hide the combine buttons during tank selection
+	_hide_combine_buttons()
 
 func _on_fish_placed():
 	if tank_selection_label:
@@ -85,6 +87,8 @@ func _on_fish_placed():
 	# Show the clams display again after placing the fish
 	if clams_container:
 		clams_container.visible = true
+	# Show the combine buttons again after placing the fish
+	_show_combine_buttons()
 
 func _on_growth_sequence_started():
 	# Hide inventory and money during growth sequence
@@ -92,6 +96,8 @@ func _on_growth_sequence_started():
 		inventory_container.visible = false
 	if clams_container:
 		clams_container.visible = false
+	# Hide the combine buttons during growth sequence
+	_hide_combine_buttons()
 
 func _on_growth_sequence_ended():
 	# Show inventory and money again after growth sequence
@@ -99,6 +105,8 @@ func _on_growth_sequence_ended():
 		inventory_container.visible = true
 	if clams_container:
 		clams_container.visible = true
+	# Show the combine buttons again after growth sequence
+	_show_combine_buttons()
 
 func _create_clams_label():
 	# Create a container to hold the icon and number
@@ -153,7 +161,7 @@ func _create_game_over_screen():
 
 	# Create game over label
 	game_over_label = Label.new()
-	game_over_label.text = "GAME OVER\n\nYou don't have enough clams to buy a tank!"
+	game_over_label.text = "GAME OVER\n\nYou're unable to buy any more tanks!"
 	game_over_label.add_theme_font_size_override("font_size", 48)
 	game_over_label.add_theme_color_override("font_color", Color.RED)
 	game_over_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -342,6 +350,22 @@ func _reset_game_state():
 	Global.caught_fish = null
 	Global.is_selecting_tank = false
 	Global.globally_caught_fish.clear()
+
+func _hide_combine_buttons():
+	# Find and hide the CombineButtonLayer
+	var root = get_tree().root
+	for child in root.get_children():
+		if child.name == "CombineButtonLayer":
+			child.visible = false
+			return
+
+func _show_combine_buttons():
+	# Find and show the CombineButtonLayer
+	var root = get_tree().root
+	for child in root.get_children():
+		if child.name == "CombineButtonLayer":
+			child.visible = true
+			return
 
 func _on_inventory_changed():
 	# Update inventory displays for each item type
