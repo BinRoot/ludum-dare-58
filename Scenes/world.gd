@@ -99,6 +99,10 @@ func _find_fish_recursive(node: Node, fish_list: Array[Node3D]):
 		_find_fish_recursive(child, fish_list)
 
 func _on_fish_caught(fish: Node3D, tile: Node3D):
+	# Prevent catching multiple fish simultaneously - ignore if already processing a catch
+	if Global.is_selecting_tank:
+		return
+
 	print("Fish caught at tile: ", tile.position)
 
 	# Remove all nets from all tiles and return 3 nets to inventory

@@ -94,13 +94,14 @@ func _process(_delta):
 					var is_under = 1.0 - (dist_xz / hex_radius)
 					max_is_under = max(max_is_under, is_under)
 
-					# Check if fish is caught by net
-					# Check both local and global caught lists to prevent double-catching
-					if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish:
-						caught_fish.append(fish_ref)
-						Global.globally_caught_fish.append(fish_ref)  # Mark as globally caught immediately
-						fish_caught.emit(fish_ref, self)
-						_celebrate_catch()
+				# Check if fish is caught by net
+				# Check both local and global caught lists to prevent double-catching
+				# Also ensure we're not already in the middle of selecting a tank for another fish
+				if has_net and dist_xz < hex_radius * 0.7 and fish_ref not in caught_fish and fish_ref not in Global.globally_caught_fish and not Global.is_selecting_tank:
+					caught_fish.append(fish_ref)
+					Global.globally_caught_fish.append(fish_ref)  # Mark as globally caught immediately
+					fish_caught.emit(fish_ref, self)
+					_celebrate_catch()
 
 		material.set_shader_parameter("fish_under", max_is_under)
 
