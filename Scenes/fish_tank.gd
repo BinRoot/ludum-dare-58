@@ -410,6 +410,9 @@ func _start_drag(mouse_pos: Vector2):
 
 	_update_hover_effect()
 
+	# Hide combine buttons while dragging
+	_hide_combine_button_layer()
+
 func _end_drag():
 	if is_dragging:
 		is_dragging = false
@@ -425,6 +428,8 @@ func _end_drag():
 		if over_sell_1 or over_sell_2:
 			print("SELLING TANK!")
 			_sell_this_tank()
+			# Show buttons again (in case tank sale fails)
+			_show_combine_button_layer()
 			return
 
 		# Store previous position in case we need to revert
@@ -447,6 +452,9 @@ func _end_drag():
 
 		# Update combine buttons after moving
 		_update_all_tanks_combine_buttons()
+
+		# Show combine buttons again after dragging ends
+		_show_combine_button_layer()
 
 func _process(_delta):
 	if is_dragging:
@@ -1364,6 +1372,22 @@ func _cleanup_combine_buttons():
 			if is_instance_valid(button):
 				button.queue_free()
 	combine_buttons.clear()
+
+# Hide the combine button layer (during dragging)
+func _hide_combine_button_layer():
+	var root = get_tree().root
+	for child in root.get_children():
+		if child.name == "CombineButtonLayer":
+			child.visible = false
+			return
+
+# Show the combine button layer (after dragging ends)
+func _show_combine_button_layer():
+	var root = get_tree().root
+	for child in root.get_children():
+		if child.name == "CombineButtonLayer":
+			child.visible = true
+			return
 
 # Combine this tank with another tank
 func _combine_with_tank(other_tank: Node3D):

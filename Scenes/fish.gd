@@ -22,7 +22,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 # ===============
 # User parameters
 # ===============
-@export var graph: Array[Vector2i] = [Vector2i(1, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4)]
+@export var graph: Array[Vector2i] = []
 @export var move_speed := (randf() * 1) + 2
 @export var bounds_shape: CollisionShape3D
 
@@ -36,6 +36,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @export var b0: float = 0.34
 @export var taper_a_power: float = 0.35
 @export var taper_b_power: float = 0.20
+@export var min_radius: float = 0.05  # Minimum radius to prevent degenerate geometry
 @export var bulge_amp: float = 0.30
 @export var bulge_center: float = 0.40
 @export var bulge_sigma: float = 0.18
@@ -45,13 +46,23 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @export var degree_bias: float = 0.60
 
 @export var add_edge_tubes: bool = true
-@export var tube_radius: float = 0.05
+@export var tube_radius: float = 0.06  # Slightly increased for better body overlap
 @export var tube_segments: int = 8
+@export var tube_overlap_factor: float = 1.15  # Tubes slightly larger to ensure connection
 
 @export var layout_iterations: int = 120
 @export var layout_area: float = 9.0
 
 @export var base_color: Color = Color(0.78, 0.9, 1.0)
+
+@export_group("Fins")
+@export var add_fins: bool = true
+@export var dorsal_fin_size: float = 0.3  # Height of dorsal fin
+@export var dorsal_fin_position: float = 0.4  # Position along body (0=tail, 1=head)
+@export var pectoral_fin_size: float = 0.25  # Size of side fins
+@export var pectoral_fin_position: float = 0.7  # Position along body
+@export var tail_fin_size: float = 0.4  # Size of tail fin
+@export var fin_segments: int = 8  # Tessellation of fins
 
 @export_group("Wiggle")
 @export var wiggle_amplitude: float = 0.15
@@ -109,6 +120,10 @@ var _spine_bias: PackedFloat32Array
 var _spine_segments: int
 
 func _ready() -> void:
+	# Generate a unique random graph for this fish if not already set
+	if graph.is_empty():
+		graph = _generate_random_graph()
+
 	# Randomize fish color only on initial creation
 	base_color = Color(randf(), randf(), randf())
 
@@ -119,6 +134,61 @@ func _ready() -> void:
 	next_surface_time = randf_range(surface_interval_min, surface_interval_max)
 	# Start hidden (underwater)
 	visible = false
+
+# Generate a random connected graph with 3-5 nodes
+func _generate_random_graph() -> Array[Vector2i]:
+	var num_nodes: int = randi_range(3, 5)
+	var edges: Array[Vector2i] = []
+
+	# Create a list of all possible edges (complete graph)
+	var all_possible_edges: Array[Vector2i] = []
+	for i in range(1, num_nodes + 1):
+		for j in range(i + 1, num_nodes + 1):
+			all_possible_edges.append(Vector2i(i, j))
+
+	# Shuffle the possible edges for randomness
+	all_possible_edges.shuffle()
+
+	# First, create a spanning tree to ensure connectivity
+	# Start with node 1 and gradually connect other nodes
+	var connected_nodes: Array[int] = [1]
+	var unconnected_nodes: Array[int] = []
+	for i in range(2, num_nodes + 1):
+		unconnected_nodes.append(i)
+
+	# Connect each unconnected node to a random connected node
+	while unconnected_nodes.size() > 0:
+		var new_node: int = unconnected_nodes.pop_back()
+		var connect_to: int = connected_nodes[randi() % connected_nodes.size()]
+
+		# Create edge (ensure smaller node is first for consistency)
+		if connect_to < new_node:
+			edges.append(Vector2i(connect_to, new_node))
+		else:
+			edges.append(Vector2i(new_node, connect_to))
+
+		connected_nodes.append(new_node)
+
+	# Now we have a connected tree with (num_nodes - 1) edges
+	# Add 0-3 additional random edges to make the graph more interesting
+	var additional_edges: int = randi_range(0, min(3, all_possible_edges.size() - edges.size()))
+
+	for edge in all_possible_edges:
+		if additional_edges <= 0:
+			break
+
+		# Check if this edge is not already in our edge list
+		var already_exists: bool = false
+		for existing_edge in edges:
+			if existing_edge == edge:
+				already_exists = true
+				break
+
+		if not already_exists:
+			edges.append(edge)
+			additional_edges -= 1
+
+	return edges
 
 # Calculate scale factor based on graph complexity
 func _calculate_complexity_scale() -> float:
@@ -258,7 +328,8 @@ func render_graph() -> void:
 	var colors: PackedColorArray = PackedColorArray()  # Store binormal direction for wiggle
 	var idx: PackedInt32Array = PackedInt32Array()
 
-	var ks: int = max(8, ring_sides)
+	# Ensure sufficient ring sides for smooth, watertight geometry
+	var ks: int = max(12, ring_sides)  # Minimum 12 sides for better connections
 	var twist: float = deg_to_rad(twist_degrees)
 
 	for j7: int in range(ns):
@@ -267,6 +338,11 @@ func render_graph() -> void:
 		var a_s: float = a0 * pow(1.0 - s_val, taper_a_power) * (1.0 + gauss) * complexity_scale
 		var b_s: float = b0 * pow(1.0 - s_val, taper_b_power) * (1.0 + gauss) * complexity_scale
 		b_s *= (1.0 + asymmetry_amp * bias[j7])
+
+		# Apply minimum radius constraint to prevent degenerate triangles
+		var min_scaled_radius: float = min_radius * complexity_scale
+		a_s = max(a_s, min_scaled_radius)
+		b_s = max(b_s, min_scaled_radius)
 
 		var phi: float = twist * s_val
 		var cph: float = cos(phi)
@@ -301,8 +377,9 @@ func render_graph() -> void:
 			var i3t: int = (j8 + 1) * ks + ((i3 + 1) % ks)
 			idx.append_array(PackedInt32Array([i0, i2t, i3t, i0, i3t, i1]))
 
-	# End caps
+	# End caps - use exact spine position for perfect closure
 	var head_c: int = verts.size()
+	# Use exact spine center point to ensure cap is watertight
 	verts.push_back(C[ns - 1])
 	norms.push_back(T[ns - 1])
 	uvs.push_back(Vector2(0.5, 1.0))
@@ -310,18 +387,21 @@ func render_graph() -> void:
 	var phi_head: float = twist * 1.0
 	var Brot_head: Vector3 = (-N[ns - 1] * sin(phi_head)) + (B[ns - 1] * cos(phi_head))
 	colors.push_back(Color(Brot_head.x, Brot_head.y, Brot_head.z, 1.0))
+	# Connect to ring with consistent winding order
 	for i4: int in range(ks):
 		var a_idx: int = (ns - 1) * ks + i4
 		var b_idx: int = (ns - 1) * ks + ((i4 + 1) % ks)
 		idx.append_array(PackedInt32Array([head_c, a_idx, b_idx]))
 
 	var tail_c: int = verts.size()
+	# Use exact spine center point for watertight tail cap
 	verts.push_back(C[0])
 	norms.push_back(-T[0])
 	uvs.push_back(Vector2(0.5, 0.0))
 	# Tail binormal (at s=0.0)
 	var Brot_tail: Vector3 = B[0]
 	colors.push_back(Color(Brot_tail.x, Brot_tail.y, Brot_tail.z, 0.0))
+	# Connect to ring with proper winding for backface
 	for i5: int in range(ks):
 		var a2_idx: int = ((i5 + 1) % ks)
 		var b2_idx: int = i5
@@ -357,8 +437,12 @@ func render_graph() -> void:
 				continue
 			var pa: Vector3 = node_anchor[au]
 			var pb: Vector3 = node_anchor[bv]
-			var scaled_tube_radius: float = tube_radius * complexity_scale
+			var scaled_tube_radius: float = tube_radius * complexity_scale * tube_overlap_factor
 			_append_cylinder(verts, norms, uvs, colors, idx, pa, pb, scaled_tube_radius, tube_segments, ring_sides)
+
+	# --- Add fins
+	if add_fins:
+		_add_fins(verts, norms, uvs, colors, idx, C, N, B, T, bias, ns, complexity_scale)
 
 	# ==============================================
 	# STEP 1: Rotate fish so spine aligns to X-axis
@@ -609,6 +693,14 @@ func _apply_transform_to_geometry(verts: PackedVector3Array, norms: PackedVector
 func _build_optimized_mesh(verts: PackedVector3Array, norms: PackedVector3Array,
 	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array) -> ArrayMesh:
 
+	# Weld nearby vertices to ensure watertight mesh
+	var weld_result: Dictionary = _weld_vertices(verts, norms, uvs, colors, idx, 0.001)
+	verts = weld_result["verts"]
+	norms = weld_result["norms"]
+	uvs = weld_result["uvs"]
+	colors = weld_result["colors"]
+	idx = weld_result["indices"]
+
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX]   = verts
@@ -622,6 +714,57 @@ func _build_optimized_mesh(verts: PackedVector3Array, norms: PackedVector3Array,
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 	return mesh
+
+# Weld vertices that are very close together to ensure watertight mesh
+func _weld_vertices(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, indices: PackedInt32Array,
+	threshold: float) -> Dictionary:
+
+	var vert_count: int = verts.size()
+	if vert_count == 0:
+		return {"verts": verts, "norms": norms, "uvs": uvs, "colors": colors, "indices": indices}
+
+	# Build a mapping from old vertex indices to new ones
+	var vert_remap: Array[int] = []
+	vert_remap.resize(vert_count)
+	var new_verts: PackedVector3Array = PackedVector3Array()
+	var new_norms: PackedVector3Array = PackedVector3Array()
+	var new_uvs: PackedVector2Array = PackedVector2Array()
+	var new_colors: PackedColorArray = PackedColorArray()
+
+	# For each vertex, check if it's close to an already processed vertex
+	for i in range(vert_count):
+		var found_match: bool = false
+		var v: Vector3 = verts[i]
+
+		# Check against already added vertices
+		for j in range(new_verts.size()):
+			if v.distance_squared_to(new_verts[j]) < threshold * threshold:
+				# This vertex is close enough to merge
+				vert_remap[i] = j
+				found_match = true
+				break
+
+		if not found_match:
+			# Add as new unique vertex
+			vert_remap[i] = new_verts.size()
+			new_verts.push_back(verts[i])
+			new_norms.push_back(norms[i])
+			new_uvs.push_back(uvs[i])
+			new_colors.push_back(colors[i])
+
+	# Remap indices
+	var new_indices: PackedInt32Array = PackedInt32Array()
+	for i in range(indices.size()):
+		new_indices.push_back(vert_remap[indices[i]])
+
+	return {
+		"verts": new_verts,
+		"norms": new_norms,
+		"uvs": new_uvs,
+		"colors": new_colors,
+		"indices": new_indices
+	}
 
 # Setup the wiggle shader with all parameters
 func _setup_wiggle_shader() -> void:
@@ -995,6 +1138,196 @@ func _append_cylinder(verts: PackedVector3Array, norms: PackedVector3Array,
 		var rj2: int = base + ((i4 + 1) % sides)
 		idx.append_array(PackedInt32Array([cap_b, ri2, rj2]))
 
+# Add fins to the fish mesh
+func _add_fins(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array,
+	C: PackedVector3Array, N: PackedVector3Array, B: PackedVector3Array,
+	T: PackedVector3Array, _bias: PackedFloat32Array, ns: int, complexity_scale: float) -> void:
+
+	# Add dorsal fin (top of fish)
+	_add_dorsal_fin(verts, norms, uvs, colors, idx, C, N, B, T, ns, complexity_scale)
+
+	# Add pectoral fins (side fins)
+	_add_pectoral_fins(verts, norms, uvs, colors, idx, C, N, B, T, ns, complexity_scale)
+
+	# Add tail fin (caudal fin)
+	_add_tail_fin(verts, norms, uvs, colors, idx, C, N, B, T, ns, complexity_scale)
+
+# Add dorsal fin on top of the fish
+func _add_dorsal_fin(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array,
+	C: PackedVector3Array, N: PackedVector3Array, B: PackedVector3Array,
+	T: PackedVector3Array, ns: int, complexity_scale: float) -> void:
+
+	var fin_idx: int = clamp(int(dorsal_fin_position * float(ns - 1)), 0, ns - 1)
+	var base_pos: Vector3 = C[fin_idx]
+	var fin_normal: Vector3 = N[fin_idx]
+	var fin_binormal: Vector3 = B[fin_idx]
+	var fin_tangent: Vector3 = T[fin_idx]
+
+	var fin_height: float = dorsal_fin_size * complexity_scale
+	var fin_width: float = dorsal_fin_size * 0.6 * complexity_scale
+
+	# Calculate body radius at this position for attachment
+	var s_val: float = float(fin_idx) / float(ns - 1)
+	var body_radius: float = a0 * pow(1.0 - s_val, taper_a_power) * complexity_scale
+	body_radius = max(body_radius, min_radius * complexity_scale)
+
+	# Base attachment points on the body
+	var base_center: Vector3 = base_pos + fin_normal * body_radius
+	var base_front: Vector3 = base_center + fin_tangent * fin_width * 0.5
+	var base_back: Vector3 = base_center - fin_tangent * fin_width * 0.5
+
+	# Tip of the fin
+	var fin_tip: Vector3 = base_center + fin_normal * fin_height
+
+	# Create triangular fin mesh
+	var offset: int = verts.size()
+
+	# Add vertices
+	verts.push_back(base_front)
+	verts.push_back(base_back)
+	verts.push_back(fin_tip)
+
+	# Calculate normal for the fin (pointing to the side)
+	var fin_face_normal: Vector3 = (fin_binormal * 0.3 + fin_normal * 0.7).normalized()
+
+	# Add normals
+	norms.push_back(fin_face_normal)
+	norms.push_back(fin_face_normal)
+	norms.push_back(fin_face_normal)
+
+	# Add UVs
+	uvs.push_back(Vector2(0.0, 0.0))
+	uvs.push_back(Vector2(1.0, 0.0))
+	uvs.push_back(Vector2(0.5, 1.0))
+
+	# Add colors (use binormal for wiggle)
+	colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+	colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+	colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+
+	# Add triangles (both sides for double-sided fin)
+	idx.append_array(PackedInt32Array([offset, offset + 1, offset + 2]))
+	idx.append_array(PackedInt32Array([offset + 2, offset + 1, offset]))
+
+# Add pectoral fins on the sides
+func _add_pectoral_fins(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array,
+	C: PackedVector3Array, N: PackedVector3Array, B: PackedVector3Array,
+	T: PackedVector3Array, ns: int, complexity_scale: float) -> void:
+
+	var fin_idx: int = clamp(int(pectoral_fin_position * float(ns - 1)), 0, ns - 1)
+	var base_pos: Vector3 = C[fin_idx]
+	var _fin_normal: Vector3 = N[fin_idx]
+	var fin_binormal: Vector3 = B[fin_idx]
+	var fin_tangent: Vector3 = T[fin_idx]
+
+	var fin_length: float = pectoral_fin_size * complexity_scale
+	var fin_width: float = pectoral_fin_size * 0.5 * complexity_scale
+
+	var s_val: float = float(fin_idx) / float(ns - 1)
+	var body_radius: float = b0 * pow(1.0 - s_val, taper_b_power) * complexity_scale
+	body_radius = max(body_radius, min_radius * complexity_scale)
+
+	# Create fins on both sides
+	for side in [-1, 1]:
+		var side_dir: Vector3 = fin_binormal * float(side)
+
+		# Base attachment on body
+		var base_attach: Vector3 = base_pos + side_dir * body_radius
+		var base_front: Vector3 = base_attach + fin_tangent * fin_width * 0.3
+		var base_back: Vector3 = base_attach - fin_tangent * fin_width * 0.3
+
+		# Fin extends outward and slightly back
+		var fin_tip: Vector3 = base_attach + side_dir * fin_length - fin_tangent * fin_width * 0.2
+
+		var offset: int = verts.size()
+
+		# Add vertices
+		verts.push_back(base_front)
+		verts.push_back(base_back)
+		verts.push_back(fin_tip)
+
+		# Normal points in the side direction
+		var fin_normal_vec: Vector3 = side_dir
+		norms.push_back(fin_normal_vec)
+		norms.push_back(fin_normal_vec)
+		norms.push_back(fin_normal_vec)
+
+		# UVs
+		uvs.push_back(Vector2(0.0, 0.0))
+		uvs.push_back(Vector2(1.0, 0.0))
+		uvs.push_back(Vector2(0.5, 1.0))
+
+		# Colors
+		colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+		colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+		colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, s_val))
+
+		# Triangles (both sides)
+		if side > 0:
+			idx.append_array(PackedInt32Array([offset, offset + 1, offset + 2]))
+			idx.append_array(PackedInt32Array([offset + 2, offset + 1, offset]))
+		else:
+			idx.append_array(PackedInt32Array([offset, offset + 2, offset + 1]))
+			idx.append_array(PackedInt32Array([offset + 1, offset + 2, offset]))
+
+# Add tail fin at the end
+func _add_tail_fin(verts: PackedVector3Array, norms: PackedVector3Array,
+	uvs: PackedVector2Array, colors: PackedColorArray, idx: PackedInt32Array,
+	C: PackedVector3Array, N: PackedVector3Array, B: PackedVector3Array,
+	T: PackedVector3Array, _ns: int, complexity_scale: float) -> void:
+
+	# Tail fin at the very end (index 0 is tail)
+	var base_pos: Vector3 = C[0]
+	var fin_normal: Vector3 = N[0]
+	var fin_binormal: Vector3 = B[0]
+	var fin_tangent: Vector3 = -T[0]  # Points away from body
+
+	var fin_span: float = tail_fin_size * complexity_scale
+	var fin_length: float = tail_fin_size * 0.8 * complexity_scale
+
+	# Create fan-shaped tail fin
+	var base_center: Vector3 = base_pos
+	var base_top: Vector3 = base_center + fin_normal * fin_span * 0.5
+	var base_bottom: Vector3 = base_center - fin_normal * fin_span * 0.5
+	var tip_top: Vector3 = base_top + fin_tangent * fin_length
+	var tip_bottom: Vector3 = base_bottom + fin_tangent * fin_length
+
+	var offset: int = verts.size()
+
+	# Add vertices for a more detailed tail fin
+	verts.push_back(base_center)
+	verts.push_back(base_top)
+	verts.push_back(tip_top)
+	verts.push_back(tip_bottom)
+	verts.push_back(base_bottom)
+
+	# Normals (perpendicular to fin surface)
+	var tail_normal: Vector3 = fin_binormal
+	for i in range(5):
+		norms.push_back(tail_normal)
+
+	# UVs
+	uvs.push_back(Vector2(0.5, 0.0))
+	uvs.push_back(Vector2(0.0, 0.0))
+	uvs.push_back(Vector2(0.0, 1.0))
+	uvs.push_back(Vector2(1.0, 1.0))
+	uvs.push_back(Vector2(1.0, 0.0))
+
+	# Colors (tail position)
+	for i in range(5):
+		colors.push_back(Color(fin_binormal.x, fin_binormal.y, fin_binormal.z, 0.0))
+
+	# Create triangles (double-sided)
+	# Top half
+	idx.append_array(PackedInt32Array([offset, offset + 1, offset + 2]))
+	idx.append_array(PackedInt32Array([offset + 2, offset + 1, offset]))
+	# Bottom half
+	idx.append_array(PackedInt32Array([offset, offset + 3, offset + 4]))
+	idx.append_array(PackedInt32Array([offset + 4, offset + 3, offset]))
+
 
 # ======================
 # Movement Functions
@@ -1113,13 +1446,13 @@ func _make_eyes_look_at_target() -> void:
 			right_fish_eye.look_at(right_fish_eye.global_position + right_dir, Vector3.UP)
 
 func _on_button_pressed() -> void:
-	graph = mutate_graph.mutate(graph)[0]
+	graph = mutate_graph.mutate_one(graph)
 	render_graph()
 
 # Grow the fish by mutating its graph
 func grow() -> void:
 	print("Fish growing! Age: ", age)
-	graph = mutate_graph.mutate(graph)[0]
+	graph = mutate_graph.mutate_one(graph)
 	render_graph()
 	# Re-pick destination after growth to avoid getting stuck
 	if is_moving:
