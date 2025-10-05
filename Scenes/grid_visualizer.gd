@@ -26,6 +26,8 @@ signal cell_clicked(row: int, col: int)
 
 func _ready():
 	grid_size = Global.house_cell_size
+	# Sync exported cost with global config so all systems use the same value
+	tank_cost = Global.tank_cost
 	_calculate_cell_size_from_boundary()
 	_position_at_boundary()
 	_create_grid_visual()

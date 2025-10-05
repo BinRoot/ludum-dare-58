@@ -506,8 +506,15 @@ func _sell_this_tank():
 			fish.queue_free()
 	contained_fish.clear()
 
-	# Schedule game over check for next frame (before removing tank)
-	call_deferred("_check_game_over_deferred")
+	# Remove from global list BEFORE checking game over
+	# (otherwise queue_free won't have removed it yet and it will still be counted)
+	all_tanks.erase(self)
+
+	# Run game over check immediately in case deferred call is delayed
+	Global.check_game_over()
+
+	# Schedule game over check for next frame on Global (this node may be freed)
+	Global.call_deferred("check_game_over")
 
 	# Remove this tank from scene
 	queue_free()
@@ -844,8 +851,15 @@ func _break_tank():
 	# Destroy the tank after a delay (let fish animations play)
 	await get_tree().create_timer(3.0).timeout
 
-	# Schedule game over check for next frame (before removing tank)
-	call_deferred("_check_game_over_deferred")
+	# Remove from global list BEFORE checking game over
+	# (otherwise queue_free won't have removed it yet and it will still be counted)
+	all_tanks.erase(self)
+
+	# Run game over check immediately in case deferred call is delayed
+	Global.check_game_over()
+
+	# Schedule game over check for next frame on Global (this node may be freed)
+	Global.call_deferred("check_game_over")
 
 	queue_free()
 

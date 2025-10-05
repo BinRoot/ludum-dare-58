@@ -17,6 +17,9 @@ signal clams_changed
 var is_game_over: bool = false
 signal game_over
 
+# Economy config
+var tank_cost: int = 20
+
 # Signal to notify when inventory changes
 signal inventory_changed
 
@@ -155,8 +158,22 @@ func check_game_over() -> bool:
 		if tank and is_instance_valid(tank):
 			tank_count += 1
 
+	# Robust fallback: if static list is empty, scan the scene tree
+	if tank_count == 0:
+		var root = get_tree().root
+		if root:
+			var nodes_to_check: Array = [root]
+			while not nodes_to_check.is_empty():
+				var node: Node = nodes_to_check.pop_back()
+				if node and is_instance_valid(node) and node.get_script() != null:
+					var script_path: String = node.get_script().resource_path
+					if script_path.ends_with("Scenes/fish_tank.gd"):
+						tank_count += 1
+				for child in node.get_children():
+					nodes_to_check.append(child)
+
 	# Game over if no tanks and can't afford to buy one
-	if tank_count == 0 and clams < 5:
+	if tank_count == 0 and clams < tank_cost:
 		is_game_over = true
 		game_over.emit()
 		return true
