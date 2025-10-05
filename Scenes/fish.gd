@@ -23,7 +23,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 # User parameters
 # ===============
 @export var graph: Array[Vector2i] = [Vector2i(1, 2), Vector2i(2, 3), Vector2i(2, 4), Vector2i(3, 4)]
-@export var move_speed := (randf() * 2) + 2
+@export var move_speed := (randf() * 1) + 2
 @export var bounds_shape: CollisionShape3D
 
 @export var body_segments: int = 64
@@ -62,7 +62,7 @@ var mutate_graph: MutateGraph = MutateGraph.new()
 @export_group("Scaling")
 @export var enable_complexity_scaling: bool = true
 @export var min_scale: float = 0.5
-@export var max_scale: float = 10.0
+@export var max_scale: float = 15.0
 @export var base_complexity: float = 5.0  # Graph with 4 nodes = 1.0 scale
 
 @export_group("Debug")

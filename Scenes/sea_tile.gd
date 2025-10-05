@@ -16,6 +16,7 @@ var original_y_position: float = 0.0
 var is_casting_net: bool = false
 var casting_tween: Tween = null
 var casting_visual: MeshInstance3D = null
+var net_placed_time: float = 0.0  # Track when net was placed for oldest-first removal
 
 # Attach to a Node3D, or run in an editor utility script
 func _ready():
@@ -127,7 +128,9 @@ func _handle_click():
 func start_casting_net():
 	# Check if player has a net available
 	if not Global.use_item("net"):
-		return  # No net available
+		# No net available - find and destroy the oldest net
+		_remove_oldest_net_and_place_here()
+		return
 
 	is_casting_net = true
 	_create_casting_visual()
@@ -142,6 +145,7 @@ func start_casting_net():
 func _complete_net_cast():
 	is_casting_net = false
 	has_net = true
+	net_placed_time = Time.get_ticks_msec() / 1000.0  # Record when net was placed
 	_remove_casting_visual()
 	_create_net_visual()
 
@@ -149,6 +153,7 @@ func place_net() -> bool:
 	# This function is now only used for immediate placement (if needed elsewhere)
 	if Global.use_item("net"):
 		has_net = true
+		net_placed_time = Time.get_ticks_msec() / 1000.0  # Record when net was placed
 		_create_net_visual()
 		return true
 	return false
@@ -156,6 +161,7 @@ func place_net() -> bool:
 func pickup_net():
 	if has_net:
 		has_net = false
+		net_placed_time = 0.0  # Reset timestamp
 		caught_fish.clear()  # Reset caught fish list
 		Global.add_item("net", 1)
 		_remove_net_visual()
@@ -164,6 +170,7 @@ func consume_net():
 	# Remove net without returning it to inventory (used when catching fish)
 	if has_net:
 		has_net = false
+		net_placed_time = 0.0  # Reset timestamp
 		caught_fish.clear()  # Reset caught fish list
 		_remove_net_visual()
 
@@ -343,3 +350,62 @@ func _create_celebration_flash():
 	# Clean up after animation
 	flash_tween.chain()
 	flash_tween.tween_callback(flash_mesh.queue_free)
+
+# Find and remove the oldest net on the board, then place a new one here
+func _remove_oldest_net_and_place_here():
+	# Find all sea tiles with nets
+	var tiles_with_nets: Array = []
+
+	# Get the world node to access all sea tiles
+	var world = _find_world_node()
+	if not world or not "sea_tiles" in world:
+		return
+
+	# Find all tiles that have nets (either placed or casting)
+	for tile in world.sea_tiles:
+		if tile and is_instance_valid(tile):
+			if tile.has_net or tile.is_casting_net:
+				tiles_with_nets.append(tile)
+
+	# If no nets exist, we can't remove any (shouldn't happen, but handle gracefully)
+	if tiles_with_nets.is_empty():
+		return
+
+	# Find the tile with the oldest net (earliest timestamp)
+	var oldest_tile = tiles_with_nets[0]
+	var oldest_time = oldest_tile.net_placed_time if oldest_tile.has_net else INF
+
+	for tile in tiles_with_nets:
+		var tile_time = tile.net_placed_time if tile.has_net else INF
+		if tile_time < oldest_time:
+			oldest_time = tile_time
+			oldest_tile = tile
+
+	# Remove the oldest net (without returning to inventory)
+	if oldest_tile.has_net:
+		oldest_tile.consume_net()
+	elif oldest_tile.is_casting_net:
+		oldest_tile.cancel_casting()
+
+	# Now place a new net here at this tile
+	is_casting_net = true
+	_create_casting_visual()
+
+	# Create a tween for the 1-second delay
+	if casting_tween and casting_tween.is_running():
+		casting_tween.kill()
+
+	casting_tween = create_tween()
+	casting_tween.tween_callback(_complete_net_cast).set_delay(1.0)
+
+# Helper function to find the world node
+func _find_world_node():
+	# Try to find the world node by traversing up the tree
+	var node = get_parent()
+	while node:
+		if node.get_script() != null:
+			var script_path = node.get_script().resource_path
+			if script_path.ends_with("world.gd"):
+				return node
+		node = node.get_parent()
+	return null
