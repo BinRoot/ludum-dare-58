@@ -171,7 +171,7 @@ func _on_fish_caught(fish: Node3D, tile: Node3D):
 
 	# First, zoom to the tile to appreciate the catch
 	if fish and tile:
-		_zoom_to_catch_then_show_fish(fish, tile)
+		await _zoom_to_catch_then_show_fish(fish, tile)
 
 func _remove_all_nets_and_return_to_inventory():
 	# Count how many nets are actually placed and remove them
@@ -571,7 +571,6 @@ func _rotate_fish_360(fish: Node3D):
 	# Create a tween to rotate the fish
 	fish_rotation_tween = create_tween()
 	fish_rotation_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
-	fish_rotation_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
 	fish_rotation_tween.set_ease(Tween.EASE_IN_OUT)
 	fish_rotation_tween.set_trans(Tween.TRANS_SINE)
 
@@ -600,7 +599,6 @@ func _animate_camera_to_original():
 	# Create the tween for camera animation back
 	camera_tween = create_tween()
 	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # Work while paused
-	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)  # Continue during pause
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
@@ -731,7 +729,6 @@ func _animate_camera_to_fish_and_grow(fish: Node3D) -> void:
 	# Create the tween for camera animation to fish
 	camera_tween = create_tween()
 	camera_tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	camera_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	camera_tween.set_ease(Tween.EASE_IN_OUT)
 	camera_tween.set_trans(Tween.TRANS_CUBIC)
 	camera_tween.set_parallel(true)
