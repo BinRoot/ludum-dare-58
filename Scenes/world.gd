@@ -93,8 +93,8 @@ func generate_hex_grid():
 			add_child(tile)
 			sea_tiles.append(tile)
 
-			# Connect to fish caught signal
-			tile.fish_caught.connect(_on_fish_caught)
+			# Connect to fish caught signal with DEFERRED flag to avoid crash when signal is emitted from _process
+			tile.fish_caught.connect(_on_fish_caught, CONNECT_DEFERRED)
 
 # Find all fish in the scene and pass them to all tiles
 func update_fish_references():
